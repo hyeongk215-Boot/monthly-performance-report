@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실적분석</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 data-i18n="appTitle">실적분석</h1>
+  <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
+    <nav class="nav-links">
+      <a href="index.html" data-i18n="backBtn">← 뒤로</a>
+    </nav>
+    <div class="lang-switch">
+      <button class="lang-btn" data-lang="ko">한국어</button>
+      <button class="lang-btn" data-lang="zh">中文</button>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="card">
+    <h2 data-i18n="adminHeading"></h2>
+    <p class="desc" data-i18n="adminDesc"></p>
+    <div class="form-grid">
+      <div>
+        <label data-i18n="adminKeyLabel"></label>
+        <input type="password" id="adminKey">
+      </div>
+      <div>
+        <label data-i18n="adminYm"></label>
+        <select id="adminYm"></select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="fetchBtn" data-i18n="adminFetch"></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="aggHeading" style="font-size:18px;"></h2>
+    <div class="chart-wrap"><canvas id="aggChart"></canvas></div>
+    <div class="table-wrap">
+      <table class="exp-table" id="aggTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th data-i18n="colCorp"></th>
+            <th data-i18n="colRevenue"></th>
+            <th data-i18n="colOperatingMarginPct"></th>
+            <th data-i18n="colNetMarginPct"></th>
+            <th data-i18n="colDebtRatio"></th>
+            <th data-i18n="colCurrentRatio"></th>
+            <th data-i18n="achievementLabel"></th>
+            <th data-i18n="cashChangePct"></th>
+            <th data-i18n="totalLoanBalanceCny"></th>
+          </tr>
+        </thead>
+        <tbody id="aggBody"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="downloadBtn" data-i18n="adminDownload"></button>
+    </div>
+  </div>
+</main>
+<footer>실적분석 · China Branch Performance Analysis</footer>
+<div class="toast" id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="vendor/chart.umd.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/common.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="js/app-admin.js"></script>
+</body>
+</html>
