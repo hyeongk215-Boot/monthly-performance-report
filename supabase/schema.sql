@@ -4,8 +4,8 @@
 -- ⚠ 전제조건: 회계관리, 예산관리, 자금집행의 schema.sql이 모두 같은 Supabase 프로젝트에 먼저
 -- 적용되어 있어야 합니다. 이 모듈은 새 테이블을 만들지 않고, 세 모듈의 테이블/함수를 그대로
 -- 조인·재사용하는 순수 조회(RPC) 레이어입니다:
---   - 회계관리: access_keys, verify_access_key(), acct_accounts, acct_statement_lines
---   - 예산관리: bgt_budget_lines
+--   - 회계관리: access_keys, verify_access_key(), acct_accounts, acct_statement_lines, acct_pl_kr_extra
+--   - 예산관리: bgt_budget_lines, bgt_target_profit, bgt_ga_lines
 --   - 자금집행: fund_cash_positions, fund_loans, get_cash_position(), get_dividend_available(),
 --     fund_prev_yearmonth() — 자금집행이 만든 함수를 그대로 호출해서 재사용합니다 (중복 구현 없음).
 --
@@ -203,6 +203,77 @@ begin
 end;
 $$;
 
+-- 목표실적 관리표: 법인 산하 지점별 목표영업이익(예산관리) 대비 실적(회계관리 PL_KR) +
+-- 인원수/접대비(회계관리 acct_pl_kr_extra) + 출장비(예산관리 bgt_ga_lines 실적) 종합.
+-- ⚠ 이 함수도 계정코드를 하드코딩합니다: 매출액 500000, 매출원가 600000, 매출이익 699999,
+-- 관리비 700000, 영업이익(한국식) 799999, 당기순이익 999999 (전부 PL_KR statement_type).
+create or replace function get_target_performance_report(
+  p_access_key text,
+  p_corp text,
+  p_yearmonth text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role text;
+  v_branch_scope text;
+  v_corp text;
+  v_offices text[];
+  v_result jsonb := '[]'::jsonb;
+  v_total jsonb;
+begin
+  select role, branch_scope into v_role, v_branch_scope from verify_access_key(p_access_key);
+  v_corp := coalesce(v_branch_scope, p_corp);
+
+  select array_agg(distinct o) into v_offices
+  from (
+    select office as o from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL_KR'
+    union
+    select office as o from acct_pl_kr_extra where corp = v_corp and yearmonth = p_yearmonth
+    union
+    select office as o from bgt_target_profit where corp = v_corp and yearmonth = p_yearmonth
+  ) s;
+
+  select jsonb_agg(to_jsonb(x) order by x.office)
+    into v_result
+  from (
+    select
+      o.office,
+      coalesce((select target_operating_profit_cny from bgt_target_profit where corp = v_corp and office = o.office and yearmonth = p_yearmonth), 0) as "targetOperatingProfitCny",
+      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '500000'), 0) as "revenueCny",
+      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '600000'), 0) as "costOfSalesCny",
+      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '699999'), 0) as "salesProfitCny",
+      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '700000'), 0) as "gaExpenseCny",
+      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '799999'), 0) as "operatingProfitCny",
+      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '999999'), 0) as "netProfitCny",
+      (select headcount from acct_pl_kr_extra where corp = v_corp and office = o.office and yearmonth = p_yearmonth) as "headcount",
+      coalesce((select entertainment_cny from acct_pl_kr_extra where corp = v_corp and office = o.office and yearmonth = p_yearmonth), 0) as "entertainmentCny",
+      coalesce((select sum(fixed_cny + variable_cny) from bgt_ga_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and category = 'travel' and kind = 'actual'), 0) as "travelCny"
+    from (select unnest(coalesce(v_offices, array[]::text[])) as office) o
+  ) x;
+
+  -- 합계 행: 비율/생산성은 개별 지점 비율의 평균이 아니라 합산된 원본 수치로 재계산
+  select jsonb_build_object(
+    'office', null,
+    'targetOperatingProfitCny', coalesce(sum((r->>'targetOperatingProfitCny')::numeric), 0),
+    'revenueCny', coalesce(sum((r->>'revenueCny')::numeric), 0),
+    'costOfSalesCny', coalesce(sum((r->>'costOfSalesCny')::numeric), 0),
+    'salesProfitCny', coalesce(sum((r->>'salesProfitCny')::numeric), 0),
+    'gaExpenseCny', coalesce(sum((r->>'gaExpenseCny')::numeric), 0),
+    'operatingProfitCny', coalesce(sum((r->>'operatingProfitCny')::numeric), 0),
+    'netProfitCny', coalesce(sum((r->>'netProfitCny')::numeric), 0),
+    'headcount', coalesce(sum((r->>'headcount')::numeric), 0),
+    'entertainmentCny', coalesce(sum((r->>'entertainmentCny')::numeric), 0),
+    'travelCny', coalesce(sum((r->>'travelCny')::numeric), 0)
+  ) into v_total
+  from jsonb_array_elements(coalesce(v_result, '[]'::jsonb)) r;
+
+  return jsonb_build_object('byOffice', coalesce(v_result, '[]'::jsonb), 'total', v_total);
+end;
+$$;
+
 -- 전체 법인 비교 (system_admin/finance 전용 - 본사 통합 리포트)
 create or replace function get_performance_aggregate(
   p_access_key text,
@@ -271,4 +342,5 @@ grant execute on function get_profitability_series(text, text, text, integer) to
 grant execute on function get_stability_series(text, text, text, integer) to anon, authenticated;
 grant execute on function get_budget_variance_summary(text, text, text) to anon, authenticated;
 grant execute on function get_fund_risk_summary(text, text, text) to anon, authenticated;
+grant execute on function get_target_performance_report(text, text, text) to anon, authenticated;
 grant execute on function get_performance_aggregate(text, text) to anon, authenticated;

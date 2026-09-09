@@ -1,3 +1,7 @@
 node_modules/
 *.log
 .DS_Store
+
+# 실제 회사 재무자료 원본 (회사 기밀 - 절대 커밋 금지)
+*.xls
+*.xlsx

@@ -8,6 +8,7 @@
   var currentPeriod = "month";
   var rawProfitSeries = [];
   var rawStabilitySeries = [];
+  var lastTargetPerf = null;
   var profitChart = null;
 
   function showToast(msg) {
@@ -103,6 +104,48 @@
     });
   }
 
+  function targetPerfRow(row, isTotal) {
+    var target = Number(row.targetOperatingProfitCny) || 0;
+    var actual = Number(row.operatingProfitCny) || 0;
+    var over = actual - target;
+    var achievePct = target ? (actual / target * 100) : null;
+    var headcount = row.headcount != null ? Number(row.headcount) : null;
+    var productivity = headcount ? (actual / headcount) : null;
+    var tr = document.createElement("tr");
+    if (isTotal) tr.className = "subtotal-row";
+    tr.innerHTML =
+      "<td style='text-align:left;'>" + (isTotal ? t("totalRowLabel") : window.officeLabel(row.office)) + "</td>" +
+      "<td>" + fmt(target) + "</td>" +
+      "<td>" + fmt(actual) + "</td>" +
+      "<td>" + fmt(over) + "</td>" +
+      "<td>" + fmtPct(achievePct) + "</td>" +
+      "<td>" + (headcount != null ? headcount : t("noData")) + "</td>" +
+      "<td>" + fmt(productivity) + "</td>" +
+      "<td>" + fmt(row.revenueCny) + "</td>" +
+      "<td>" + fmt(row.costOfSalesCny) + "</td>" +
+      "<td>" + fmt(row.salesProfitCny) + "</td>" +
+      "<td>" + fmt(row.gaExpenseCny) + "</td>" +
+      "<td>" + fmt(row.entertainmentCny) + "</td>" +
+      "<td>" + fmt(row.travelCny) + "</td>" +
+      "<td>" + fmt(row.netProfitCny) + "</td>";
+    return tr;
+  }
+
+  function renderTargetPerf(data) {
+    lastTargetPerf = data;
+    var body = document.getElementById("targetPerfBody");
+    body.innerHTML = "";
+    var rows = (data && data.byOffice) || [];
+    if (!rows.length) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td colspan='14' style='color:var(--muted);'>" + t("noData") + "</td>";
+      body.appendChild(tr);
+      return;
+    }
+    rows.forEach(function (row) { body.appendChild(targetPerfRow(row, false)); });
+    if (data.total) body.appendChild(targetPerfRow(data.total, true));
+  }
+
   function renderFund(summary) {
     document.getElementById("fundEndingCny").textContent = fmt(summary.endingCny);
     document.getElementById("fundPrevEndingCny").textContent = fmt(summary.prevEndingCny);
@@ -152,6 +195,11 @@
       if (res.error) throw res.error;
       renderFund(res.data);
     }).catch(function () { showToast(t("fetchFail")); });
+
+    client.rpc("get_target_performance_report", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth }).then(function (res) {
+      if (res.error) throw res.error;
+      renderTargetPerf(res.data || {});
+    }).catch(function () { showToast(t("fetchFail")); });
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -161,6 +209,7 @@
       renderContextBar();
       renderProfit();
       renderStability();
+      if (lastTargetPerf) renderTargetPerf(lastTargetPerf);
     });
   });
 })();
