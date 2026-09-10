@@ -22,7 +22,7 @@
 <main>
   <div class="card">
     <div class="context-bar" id="contextBar"></div>
-    <div class="form-grid">
+    <div class="form-grid" id="officeSelectWrap">
       <div>
         <label data-i18n="office"></label>
         <select id="officeSelect"></select>
@@ -44,7 +44,7 @@
           <tr>
             <th data-i18n="colMonth"></th>
             <th data-i18n="colRevenue"></th>
-            <th data-i18n="colOperatingProfit"></th>
+            <th data-i18n="colOperatingProfitKr"></th>
             <th data-i18n="colNetProfit"></th>
             <th data-i18n="colOperatingMarginPct"></th>
             <th data-i18n="colNetMarginPct"></th>
@@ -81,6 +81,9 @@
       <div class="metric-card"><div class="label" data-i18n="gaBudgetLabel"></div><div class="value" id="gaBudgetCny">-</div></div>
       <div class="metric-card"><div class="label" data-i18n="gaActualLabel"></div><div class="value" id="gaActualCny">-</div></div>
       <div class="metric-card"><div class="label" data-i18n="achievementLabel"></div><div class="value" id="gaAchievementPct">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="colSalesMarginPct"></div><div class="value" id="salesMarginPct">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="colOperatingMarginPct"></div><div class="value" id="operatingMarginPct">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="colNetMarginPct"></div><div class="value" id="netMarginPct">-</div></div>
     </div>
   </div>
 
@@ -104,9 +107,9 @@
       <table class="exp-table" id="targetPerfTable">
         <thead>
           <tr>
-            <th data-i18n="office"></th>
+            <th data-i18n="colPeriod"></th>
             <th data-i18n="colTargetProfitCny"></th>
-            <th data-i18n="colOperatingProfit"></th>
+            <th data-i18n="colOperatingProfitKr"></th>
             <th data-i18n="colOverAchievedCny"></th>
             <th data-i18n="colAchievementRate"></th>
             <th data-i18n="colHeadcount"></th>

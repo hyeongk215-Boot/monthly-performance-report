@@ -12,6 +12,7 @@
   <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
     <nav class="nav-links">
       <a href="admin.html" data-i18n="navAdmin">본사용: 관리자 화면</a>
+      <a href="admin-kpi.html" data-i18n="navKpi">경영지표 페이지</a>
     </nav>
     <div class="lang-switch">
       <button class="lang-btn" data-lang="ko">한국어</button>
@@ -137,13 +138,18 @@ document.addEventListener("DOMContentLoaded", function () {
         finalCorp = info.branch_scope;
         showToast(t("keyMismatchBranch", { branch: window.corpLabel(info.branch_scope) }));
       }
+      var finalOffice = office;
+      if (info.office_scope) {
+        finalOffice = info.office_scope;
+      }
       window.saveContext({
         corp: finalCorp,
-        office: office,
+        office: finalOffice,
         yearmonth: yearmonth,
         accessKey: accessKey,
         role: info.role,
-        branchScope: info.branch_scope
+        branchScope: info.branch_scope,
+        officeScope: info.office_scope
       });
       window.location.href = "view.html";
     }).catch(function () {

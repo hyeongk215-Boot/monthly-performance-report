@@ -145,6 +145,11 @@ tr.subtotal-row td { background: #f3f6fb; font-weight: 700; }
 tr.subtotal-row input { font-weight: 700; background: #f3f6fb; }
 .key-gate { max-width: 480px; margin: 60px auto; }
 
+/* ===== 실적분석: 목표실적 관리표 원본 엑셀 색상 근사 ===== */
+tr.row-target td { background: #fff9c4; }
+tr.row-rate td { background: #fffde7; }
+tr.row-subtotal td { background: #eef1f6; font-weight: 700; }
+
 /* ===== 자금집행 공통: 시재 카드 / 추이 화살표 ===== */
 .metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
 .metric-card { background: #f7f9fb; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }

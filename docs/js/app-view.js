@@ -29,9 +29,25 @@
 
   function renderContextBar() {
     var el = document.getElementById("contextBar");
+    var officePart = ctx.office
+      ? "<span><b>" + t("office") + "</b>: " + window.officeLabel(ctx.office) + "</span>"
+      : "";
     el.innerHTML =
       "<span><b>" + t("corp") + "</b>: " + window.corpLabel(ctx.corp) + "</span>" +
-      "<span><b>" + t("yearmonth") + "</b>: " + ctx.yearmonth + "</span>";
+      officePart +
+      "<span><b>" + t("yearmonth") + "</b>: <select id='ymSwitch'></select></span>";
+    var sel = document.getElementById("ymSwitch");
+    window.generateYearMonths().forEach(function (ym) {
+      var o = document.createElement("option");
+      o.value = ym; o.textContent = ym;
+      sel.appendChild(o);
+    });
+    sel.value = ctx.yearmonth;
+    sel.addEventListener("change", function () {
+      ctx.yearmonth = sel.value;
+      window.saveContext(ctx);
+      loadAll();
+    });
   }
 
   function officesForCorp(corp) {
@@ -39,7 +55,16 @@
     return window.APP_CONFIG.OFFICES.filter(function (o) { return codes.indexOf(o.ko) !== -1; });
   }
 
+  // office_scope가 있는 접근키(예: 상해지점 전용 키)는 타 지점을 선택할 수 없도록 드롭다운을
+  // 감추고 고정 지점명만 표시합니다.
   function renderOfficeSelect() {
+    var wrap = document.getElementById("officeSelectWrap");
+    if (ctx.officeScope) {
+      wrap.style.display = "none";
+      currentOffice = ctx.officeScope;
+      return;
+    }
+    wrap.style.display = "";
     var sel = document.getElementById("officeSelect");
     sel.innerHTML = "";
     var allOpt = document.createElement("option");
@@ -58,7 +83,7 @@
   }
 
   function renderProfit() {
-    var rows = window.aggregateFlowSeries(rawProfitSeries, currentPeriod, ["revenueCny", "operatingProfitCny", "netProfitCny"]);
+    var rows = window.aggregateFlowSeries(rawProfitSeries, currentPeriod, ["revenueCny", "salesProfitCny", "operatingProfitCny", "netProfitCny"]);
     var body = document.getElementById("profitBody");
     body.innerHTML = "";
     rows.forEach(function (row) {
@@ -83,12 +108,28 @@
         labels: rows.map(function (r) { return r.yearmonth; }),
         datasets: [
           { label: t("colRevenue"), data: rows.map(function (r) { return r.revenueCny; }), borderColor: "#1a4d8f", backgroundColor: "transparent" },
-          { label: t("colOperatingProfit"), data: rows.map(function (r) { return r.operatingProfitCny; }), borderColor: "#1e7e34", backgroundColor: "transparent" },
+          { label: t("colOperatingProfitKr"), data: rows.map(function (r) { return r.operatingProfitCny; }), borderColor: "#1e7e34", backgroundColor: "transparent" },
           { label: t("colNetProfit"), data: rows.map(function (r) { return r.netProfitCny; }), borderColor: "#b8860b", backgroundColor: "transparent" }
         ]
       },
       options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
     });
+
+    renderMarginCards();
+  }
+
+  // "실적 지표" 카드의 매출이익률/영업이익률/당기순이익률: 선택된 적용년월(가장 최근 달) 기준.
+  function renderMarginCards() {
+    var last = rawProfitSeries.length ? rawProfitSeries[rawProfitSeries.length - 1] : null;
+    if (!last || !last.revenueCny) {
+      document.getElementById("salesMarginPct").textContent = t("noData");
+      document.getElementById("operatingMarginPct").textContent = t("noData");
+      document.getElementById("netMarginPct").textContent = t("noData");
+      return;
+    }
+    document.getElementById("salesMarginPct").textContent = fmtPct(last.salesProfitCny / last.revenueCny * 100);
+    document.getElementById("operatingMarginPct").textContent = fmtPct(last.operatingProfitCny / last.revenueCny * 100);
+    document.getElementById("netMarginPct").textContent = fmtPct(last.netProfitCny / last.revenueCny * 100);
   }
 
   function renderStability() {
@@ -124,7 +165,7 @@
     var tr = document.createElement("tr");
     if (isTotal) tr.className = "subtotal-row";
     tr.innerHTML =
-      "<td style='text-align:left;'>" + (isTotal ? t("totalRowLabel") : window.officeLabel(row.office)) + "</td>" +
+      "<td style='text-align:left;'>" + row.label + "</td>" +
       "<td>" + fmt(target) + "</td>" +
       "<td>" + fmt(actual) + "</td>" +
       "<td>" + fmt(over) + "</td>" +
@@ -141,10 +182,18 @@
     return tr;
   }
 
+  function periodTypeForRpc() {
+    if (currentPeriod === "year") return "annual";
+    return currentPeriod; // "month" | "quarter"
+  }
+
   function renderTargetPerfPeriodLabel() {
     var month = Number(ctx.yearmonth.slice(5, 7));
     var year = ctx.yearmonth.slice(0, 4);
-    var label = month === 1 ? t("periodSingleMonth", { year: year, month: month }) : t("periodCumulative", { year: year, month: month });
+    var label;
+    if (currentPeriod === "month") label = t("periodTargetMonthly", { year: year, month: month });
+    else if (currentPeriod === "quarter") label = t("periodTargetQuarterly", { year: year, month: month });
+    else label = t("periodTargetAnnual", { year: year, month: month });
     document.getElementById("targetPerfPeriodLabel").textContent = label;
   }
 
@@ -153,15 +202,16 @@
     renderTargetPerfPeriodLabel();
     var body = document.getElementById("targetPerfBody");
     body.innerHTML = "";
-    var rows = (data && data.byOffice) || [];
-    if (!rows.length) {
+    var periods = (data && data.periods) || [];
+    if (!periods.length) {
       var tr = document.createElement("tr");
       tr.innerHTML = "<td colspan='14' style='color:var(--muted);'>" + t("noData") + "</td>";
       body.appendChild(tr);
       return;
     }
-    rows.forEach(function (row) { body.appendChild(targetPerfRow(row, false)); });
-    if (data.total) body.appendChild(targetPerfRow(data.total, true));
+    periods.forEach(function (row, i) {
+      body.appendChild(targetPerfRow(row, i === periods.length - 1));
+    });
   }
 
   function renderFund(summary) {
@@ -181,6 +231,7 @@
       currentPeriod = btn.dataset.period;
       renderProfit();
       renderStability();
+      loadTargetPerf();
     });
   }
 
@@ -189,6 +240,7 @@
       currentOffice = e.target.value;
       applyFundVisibility();
       loadOfficeScopedData();
+      loadTargetPerf();
     });
   }
 
@@ -221,6 +273,20 @@
     }
   }
 
+  function loadTargetPerf() {
+    var client = window.getSupabaseClient();
+    if (!client) return;
+    var year = ctx.yearmonth.slice(0, 4);
+    var month = ctx.yearmonth.slice(5, 7);
+    client.rpc("get_target_performance_series", {
+      p_access_key: ctx.accessKey, p_corp: ctx.corp, p_office: currentOffice || null,
+      p_year: year, p_end_month: month, p_period_type: periodTypeForRpc()
+    }).then(function (res) {
+      if (res.error) throw res.error;
+      renderTargetPerf(res.data || {});
+    }).catch(function () { showToast(t("fetchFail")); });
+  }
+
   function loadAll() {
     var client = window.getSupabaseClient();
     if (!client) {
@@ -231,11 +297,7 @@
     renderOfficeSelect();
     applyFundVisibility();
     loadOfficeScopedData();
-
-    client.rpc("get_target_performance_report", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth }).then(function (res) {
-      if (res.error) throw res.error;
-      renderTargetPerf(res.data || {});
-    }).catch(function () { showToast(t("fetchFail")); });
+    loadTargetPerf();
   }
 
   document.addEventListener("DOMContentLoaded", function () {

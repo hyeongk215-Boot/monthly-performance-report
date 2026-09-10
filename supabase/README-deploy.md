@@ -21,12 +21,17 @@
 
 ## 3. 계정코드/법인 목록 하드코딩 주의 (중요)
 
-- `get_profitability_series`/`get_stability_series`/`get_budget_variance_summary`/
-  `get_performance_aggregate`는 회계관리의 실제 계정코드(매출액 500000, 영업이익 799999, 당기순이익
-  999999, 유동자산합계 BS-L18, 유동부채합계 BS-R52, 부채합계 BS-R58, 자본총계 BS-R68)를 참조합니다.
-  회계관리에서 계정과목을 다시 교체하면 이 파일의 해당 함수들을 새 코드에 맞게 다시
-  실행(create or replace)해야 합니다.
-- `perf_all_corps()`는 6개 법인 목록을 하드코딩합니다. 법인이 추가/변경되면 이 함수도 같이 수정하세요.
+- `get_profitability_series`(PL_KR 500000/699999/799999/999999), `get_stability_series`/
+  `get_financial_ratios`/`get_performance_aggregate`(BS 유동자산합계 BS-L16, 유동부채합계 BS-R42,
+  부채합계 BS-R47, 자본총계 BS-R56, 자산총계 BS-L29), `perf_target_bucket`(PL_KR 500000/600000/
+  699999/700000/799999/999999)이 회계관리의 실제 계정코드를 참조합니다. 회계관리에서 계정과목을
+  다시 교체하면 이 파일의 해당 함수들을 새 코드에 맞게 다시 실행(create or replace)해야 합니다.
+  ⚠ v3에서 회계관리 v6(BS 58개 재작성)에 맞춰 BS 코드를 갱신했습니다(옛 BS-L18/BS-R52/BS-R58/
+  BS-R68은 이미 비활성화된 코드를 가리키고 있어 재무안정성 지표가 조용히 0/잘못된 값을 반환하고
+  있었습니다) — 계정과목이 또 바뀌면 이 모듈도 반드시 함께 갱신하세요.
+- `perf_all_corps()`는 6개 법인 목록을, `get_target_performance_group()`은 법인그룹(①YJC
+  포워딩/②흥아물류 외 4개 법인)의 소속 법인명을 하드코딩합니다. 법인이 추가/변경되면 이 함수들도
+  같이 수정하세요.
 
 ## 4. Chart.js
 
