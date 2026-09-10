@@ -22,6 +22,12 @@
 <main>
   <div class="card">
     <div class="context-bar" id="contextBar"></div>
+    <div class="form-grid">
+      <div>
+        <label data-i18n="office"></label>
+        <select id="officeSelect"></select>
+      </div>
+    </div>
     <div class="period-toggle" id="periodToggle">
       <button class="period-btn period-active" data-period="month" data-i18n="periodMonth">월간</button>
       <button class="period-btn" data-period="quarter" data-i18n="periodQuarter">분기</button>
@@ -67,28 +73,20 @@
 
   <div class="card">
     <h2 data-i18n="budgetHeading" style="font-size:18px;"></h2>
+    <p class="desc" data-i18n="budgetHeadingDesc"></p>
     <div class="metric-cards">
-      <div class="metric-card"><div class="label" data-i18n="totalBudgetLabel"></div><div class="value" id="totalBudgetCny">-</div></div>
-      <div class="metric-card"><div class="label" data-i18n="totalActualLabel"></div><div class="value" id="totalActualCny">-</div></div>
-      <div class="metric-card"><div class="label" data-i18n="achievementLabel"></div><div class="value" id="achievementPct">-</div></div>
-    </div>
-    <h3 data-i18n="overAccountsHeading" style="font-size:14px;"></h3>
-    <div class="table-wrap">
-      <table class="exp-table" id="overTable">
-        <thead>
-          <tr>
-            <th data-i18n="colAccount"></th>
-            <th data-i18n="colBudgetCny"></th>
-            <th data-i18n="colActualCny"></th>
-          </tr>
-        </thead>
-        <tbody id="overBody"></tbody>
-      </table>
+      <div class="metric-card"><div class="label" data-i18n="targetProfitLabel"></div><div class="value" id="targetProfitCny">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="actualProfitLabel"></div><div class="value" id="actualProfitCny">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="achievementLabel"></div><div class="value" id="profitAchievementPct">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="gaBudgetLabel"></div><div class="value" id="gaBudgetCny">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="gaActualLabel"></div><div class="value" id="gaActualCny">-</div></div>
+      <div class="metric-card"><div class="label" data-i18n="achievementLabel"></div><div class="value" id="gaAchievementPct">-</div></div>
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="fundCard">
     <h2 data-i18n="fundHeading" style="font-size:18px;"></h2>
+    <p class="desc" data-i18n="fundCorpOnlyNote"></p>
     <div class="metric-cards">
       <div class="metric-card"><div class="label" data-i18n="endingCny"></div><div class="value" id="fundEndingCny">-</div></div>
       <div class="metric-card"><div class="label" data-i18n="prevEndingCny"></div><div class="value" id="fundPrevEndingCny">-</div></div>
@@ -101,6 +99,7 @@
   <div class="card">
     <h2 data-i18n="targetPerfHeading" style="font-size:18px;"></h2>
     <p class="desc" data-i18n="targetPerfDesc"></p>
+    <p class="desc" id="targetPerfPeriodLabel" style="font-weight:600;"></p>
     <div class="table-wrap">
       <table class="exp-table" id="targetPerfTable">
         <thead>

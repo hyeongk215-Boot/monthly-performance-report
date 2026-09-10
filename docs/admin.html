@@ -39,6 +39,94 @@
   </div>
 
   <div class="card">
+    <h2 data-i18n="targetPerfAdminHeading" style="font-size:18px;"></h2>
+    <p class="desc" data-i18n="targetPerfAdminDesc"></p>
+    <div class="form-grid">
+      <div>
+        <label data-i18n="corp"></label>
+        <select id="reportCorp"></select>
+      </div>
+      <div>
+        <label data-i18n="office"></label>
+        <select id="reportOffice"></select>
+      </div>
+      <div>
+        <label data-i18n="yearmonth"></label>
+        <select id="reportYm"></select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="fetchReportBtn" data-i18n="adminFetch"></button>
+      <button class="btn-secondary" id="downloadReportBtn" data-i18n="adminDownload"></button>
+    </div>
+
+    <h3 style="font-size:14px;" id="reportCurrentLabel"></h3>
+    <div class="table-wrap">
+      <table class="exp-table" id="reportCurrentTable">
+        <thead>
+          <tr>
+            <th data-i18n="office"></th>
+            <th data-i18n="colTargetProfitCny"></th>
+            <th data-i18n="colOperatingProfit"></th>
+            <th data-i18n="colOverAchievedCny"></th>
+            <th data-i18n="colAchievementRate"></th>
+            <th data-i18n="colHeadcount"></th>
+            <th data-i18n="colProductivity"></th>
+            <th data-i18n="colRevenue"></th>
+            <th data-i18n="colCostOfSalesCny"></th>
+            <th data-i18n="colSalesProfitCny"></th>
+            <th data-i18n="colGaExpenseCny"></th>
+            <th data-i18n="colEntertainmentCny"></th>
+            <th data-i18n="colTravelCny"></th>
+            <th data-i18n="colNetProfit"></th>
+          </tr>
+        </thead>
+        <tbody id="reportCurrentBody"></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:14px;" id="reportPrevLabel"></h3>
+    <div class="table-wrap">
+      <table class="exp-table" id="reportPrevTable">
+        <thead>
+          <tr>
+            <th data-i18n="office"></th>
+            <th data-i18n="colRevenue"></th>
+            <th data-i18n="colCostOfSalesCny"></th>
+            <th data-i18n="colSalesProfitCny"></th>
+            <th data-i18n="colGaExpenseCny"></th>
+            <th data-i18n="colEntertainmentCny"></th>
+            <th data-i18n="colTravelCny"></th>
+            <th data-i18n="colOperatingProfit"></th>
+            <th data-i18n="colNetProfit"></th>
+          </tr>
+        </thead>
+        <tbody id="reportPrevBody"></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:14px;" data-i18n="reportYoyHeading"></h3>
+    <div class="table-wrap">
+      <table class="exp-table" id="reportYoyTable">
+        <thead>
+          <tr>
+            <th data-i18n="office"></th>
+            <th data-i18n="colRevenue"></th>
+            <th data-i18n="colCostOfSalesCny"></th>
+            <th data-i18n="colSalesProfitCny"></th>
+            <th data-i18n="colGaExpenseCny"></th>
+            <th data-i18n="colEntertainmentCny"></th>
+            <th data-i18n="colTravelCny"></th>
+            <th data-i18n="colOperatingProfit"></th>
+            <th data-i18n="colNetProfit"></th>
+          </tr>
+        </thead>
+        <tbody id="reportYoyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
     <h2 data-i18n="aggHeading" style="font-size:18px;"></h2>
     <div class="chart-wrap"><canvas id="aggChart"></canvas></div>
     <div class="table-wrap">

@@ -29,6 +29,10 @@
         <select id="corp"></select>
       </div>
       <div>
+        <label data-i18n="office"></label>
+        <select id="office"></select>
+      </div>
+      <div>
         <label data-i18n="yearmonth">적용년도월</label>
         <select id="yearmonth"></select>
       </div>
@@ -83,8 +87,18 @@ function showToast(msg) {
   el.classList.add("show");
   setTimeout(function () { el.classList.remove("show"); }, 3000);
 }
+function officesForCorp(corp) {
+  var codes = (window.APP_CONFIG.CORP_OFFICES && window.APP_CONFIG.CORP_OFFICES[corp]) || [];
+  return window.APP_CONFIG.OFFICES.filter(function (o) { return codes.indexOf(o.ko) !== -1; });
+}
+function refreshOfficeOptions() {
+  var corp = document.getElementById("corp").value;
+  var list = corp ? officesForCorp(corp) : [];
+  fillLocalizedSelect(document.getElementById("office"), list, "officeAllOption");
+}
 function init() {
   fillLocalizedSelect(document.getElementById("corp"), window.APP_CONFIG.CORPORATIONS, "selectPlaceholder");
+  refreshOfficeOptions();
   var ymSel = document.getElementById("yearmonth");
   var hadYm = ymSel.value;
   fillSelect(ymSel, window.generateYearMonths(), "selectPlaceholder");
@@ -93,9 +107,11 @@ function init() {
 document.addEventListener("DOMContentLoaded", function () {
   init();
   document.addEventListener("langchange", init);
+  document.getElementById("corp").addEventListener("change", refreshOfficeOptions);
 
   document.getElementById("startBtn").addEventListener("click", function () {
     var corp = document.getElementById("corp").value;
+    var office = document.getElementById("office").value;
     var yearmonth = document.getElementById("yearmonth").value;
     var accessKey = document.getElementById("accessKey").value;
     if (!corp || !yearmonth || !accessKey) {
@@ -123,6 +139,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       window.saveContext({
         corp: finalCorp,
+        office: office,
         yearmonth: yearmonth,
         accessKey: accessKey,
         role: info.role,

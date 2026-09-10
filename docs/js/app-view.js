@@ -6,6 +6,7 @@
   }
 
   var currentPeriod = "month";
+  var currentOffice = ctx.office || "";
   var rawProfitSeries = [];
   var rawStabilitySeries = [];
   var lastTargetPerf = null;
@@ -31,6 +32,29 @@
     el.innerHTML =
       "<span><b>" + t("corp") + "</b>: " + window.corpLabel(ctx.corp) + "</span>" +
       "<span><b>" + t("yearmonth") + "</b>: " + ctx.yearmonth + "</span>";
+  }
+
+  function officesForCorp(corp) {
+    var codes = (window.APP_CONFIG.CORP_OFFICES && window.APP_CONFIG.CORP_OFFICES[corp]) || [];
+    return window.APP_CONFIG.OFFICES.filter(function (o) { return codes.indexOf(o.ko) !== -1; });
+  }
+
+  function renderOfficeSelect() {
+    var sel = document.getElementById("officeSelect");
+    sel.innerHTML = "";
+    var allOpt = document.createElement("option");
+    allOpt.value = ""; allOpt.textContent = t("officeAllOption");
+    sel.appendChild(allOpt);
+    officesForCorp(ctx.corp).forEach(function (item) {
+      var o = document.createElement("option");
+      o.value = item.ko; o.textContent = window.officeLabel(item.ko);
+      sel.appendChild(o);
+    });
+    sel.value = currentOffice;
+  }
+
+  function applyFundVisibility() {
+    document.getElementById("fundCard").style.display = currentOffice ? "none" : "block";
   }
 
   function renderProfit() {
@@ -82,26 +106,12 @@
   }
 
   function renderBudget(summary) {
-    document.getElementById("totalBudgetCny").textContent = fmt(summary.totalBudgetCny);
-    document.getElementById("totalActualCny").textContent = fmt(summary.totalActualCny);
-    document.getElementById("achievementPct").textContent = fmtPct(summary.achievementPct);
-    var body = document.getElementById("overBody");
-    body.innerHTML = "";
-    var over = summary.overAccounts || [];
-    if (!over.length) {
-      var tr = document.createElement("tr");
-      tr.innerHTML = "<td colspan='3' style='color:var(--muted);'>" + t("noOverAccounts") + "</td>";
-      body.appendChild(tr);
-      return;
-    }
-    over.forEach(function (a) {
-      var tr = document.createElement("tr");
-      tr.innerHTML =
-        "<td style='text-align:left;'>" + (getLang() === "zh" ? a.nameZh : a.nameKo) + "</td>" +
-        "<td>" + fmt(a.budgetCny) + "</td>" +
-        "<td>" + fmt(a.actualCny) + "</td>";
-      body.appendChild(tr);
-    });
+    document.getElementById("targetProfitCny").textContent = fmt(summary.targetProfitCny);
+    document.getElementById("actualProfitCny").textContent = fmt(summary.actualProfitCny);
+    document.getElementById("profitAchievementPct").textContent = fmtPct(summary.profitAchievementPct);
+    document.getElementById("gaBudgetCny").textContent = fmt(summary.gaBudgetCny);
+    document.getElementById("gaActualCny").textContent = fmt(summary.gaActualCny);
+    document.getElementById("gaAchievementPct").textContent = fmtPct(summary.gaAchievementPct);
   }
 
   function targetPerfRow(row, isTotal) {
@@ -131,8 +141,16 @@
     return tr;
   }
 
+  function renderTargetPerfPeriodLabel() {
+    var month = Number(ctx.yearmonth.slice(5, 7));
+    var year = ctx.yearmonth.slice(0, 4);
+    var label = month === 1 ? t("periodSingleMonth", { year: year, month: month }) : t("periodCumulative", { year: year, month: month });
+    document.getElementById("targetPerfPeriodLabel").textContent = label;
+  }
+
   function renderTargetPerf(data) {
     lastTargetPerf = data;
+    renderTargetPerfPeriodLabel();
     var body = document.getElementById("targetPerfBody");
     body.innerHTML = "";
     var rows = (data && data.byOffice) || [];
@@ -166,6 +184,43 @@
     });
   }
 
+  function bindOfficeSelect() {
+    document.getElementById("officeSelect").addEventListener("change", function (e) {
+      currentOffice = e.target.value;
+      applyFundVisibility();
+      loadOfficeScopedData();
+    });
+  }
+
+  function loadOfficeScopedData() {
+    var client = window.getSupabaseClient();
+    if (!client) { showToast(t("fetchFail")); return; }
+
+    client.rpc("get_profitability_series", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth, p_months_back: 12, p_office: currentOffice || null }).then(function (res) {
+      if (res.error) throw res.error;
+      rawProfitSeries = res.data || [];
+      renderProfit();
+    }).catch(function () { showToast(t("fetchFail")); });
+
+    client.rpc("get_stability_series", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth, p_months_back: 12, p_office: currentOffice || null }).then(function (res) {
+      if (res.error) throw res.error;
+      rawStabilitySeries = res.data || [];
+      renderStability();
+    }).catch(function () { showToast(t("fetchFail")); });
+
+    client.rpc("get_budget_variance_summary", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth, p_office: currentOffice || null }).then(function (res) {
+      if (res.error) throw res.error;
+      renderBudget(res.data);
+    }).catch(function () { showToast(t("fetchFail")); });
+
+    if (!currentOffice) {
+      client.rpc("get_fund_risk_summary", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth }).then(function (res) {
+        if (res.error) throw res.error;
+        renderFund(res.data);
+      }).catch(function () { showToast(t("fetchFail")); });
+    }
+  }
+
   function loadAll() {
     var client = window.getSupabaseClient();
     if (!client) {
@@ -173,28 +228,9 @@
       return;
     }
     renderContextBar();
-
-    client.rpc("get_profitability_series", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth, p_months_back: 12 }).then(function (res) {
-      if (res.error) throw res.error;
-      rawProfitSeries = res.data || [];
-      renderProfit();
-    }).catch(function () { showToast(t("fetchFail")); });
-
-    client.rpc("get_stability_series", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth, p_months_back: 12 }).then(function (res) {
-      if (res.error) throw res.error;
-      rawStabilitySeries = res.data || [];
-      renderStability();
-    }).catch(function () { showToast(t("fetchFail")); });
-
-    client.rpc("get_budget_variance_summary", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth }).then(function (res) {
-      if (res.error) throw res.error;
-      renderBudget(res.data);
-    }).catch(function () { showToast(t("fetchFail")); });
-
-    client.rpc("get_fund_risk_summary", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth }).then(function (res) {
-      if (res.error) throw res.error;
-      renderFund(res.data);
-    }).catch(function () { showToast(t("fetchFail")); });
+    renderOfficeSelect();
+    applyFundVisibility();
+    loadOfficeScopedData();
 
     client.rpc("get_target_performance_report", { p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth }).then(function (res) {
       if (res.error) throw res.error;
@@ -204,9 +240,11 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     bindPeriodToggle();
+    bindOfficeSelect();
     loadAll();
     document.addEventListener("langchange", function () {
       renderContextBar();
+      renderOfficeSelect();
       renderProfit();
       renderStability();
       if (lastTargetPerf) renderTargetPerf(lastTargetPerf);

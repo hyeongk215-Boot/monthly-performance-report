@@ -24,12 +24,21 @@ as $$
   select array['YJC 포워딩','상해물류센터','흥아물류','윤봉물류','청도 CY','창씽 CY'];
 $$;
 
+-- ⚠ 아래 세 함수는 p_office 파라미터가 새로 추가되면서 인자 개수가 바뀌어 create or replace로
+-- 대체되지 않고 옛 오버로드가 남으므로 명시적으로 드롭합니다.
+drop function if exists get_profitability_series(text, text, text, integer);
+drop function if exists get_stability_series(text, text, text, integer);
+drop function if exists get_budget_variance_summary(text, text, text);
+
 -- 최근 N개월 수익성 추이 (매출/영업이익/순이익, 흐름지표이므로 프론트에서 기간 합산)
+-- p_office가 비어있으면 법인 전체(전 지점 합산), 지정하면 그 지점만.
+-- ⚠ office 차원이 생긴 뒤로는 코드당 여러 행(지점별)이 있을 수 있어 반드시 sum()으로 합산합니다.
 create or replace function get_profitability_series(
   p_access_key text,
   p_corp text,
   p_yearmonth text,
-  p_months_back integer default 12
+  p_months_back integer default 12,
+  p_office text default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -55,9 +64,9 @@ begin
   select jsonb_agg(to_jsonb(x) order by x.yearmonth) into v_result
   from (
     select m.yearmonth,
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'PL' and account_code = '500000'), 0) as "revenueCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'PL' and account_code = '799999'), 0) as "operatingProfitCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'PL' and account_code = '999999'), 0) as "netProfitCny"
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'PL' and account_code = '500000' and (nullif(p_office, '') is null or office = p_office)), 0) as "revenueCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'PL' and account_code = '799999' and (nullif(p_office, '') is null or office = p_office)), 0) as "operatingProfitCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'PL' and account_code = '999999' and (nullif(p_office, '') is null or office = p_office)), 0) as "netProfitCny"
     from months m
   ) x;
 
@@ -66,11 +75,13 @@ end;
 $$;
 
 -- 최근 N개월 재무안정성 비율 (부채비율/유동비율, 저량지표이므로 프론트에서 기간말 값만 사용)
+-- p_office가 비어있으면 법인 전체(전 지점 합산), 지정하면 그 지점만.
 create or replace function get_stability_series(
   p_access_key text,
   p_corp text,
   p_yearmonth text,
-  p_months_back integer default 12
+  p_months_back integer default 12,
+  p_office text default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -95,10 +106,10 @@ begin
   ),
   raw as (
     select m.yearmonth,
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-L18'), 0) as current_assets,
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-R52'), 0) as current_liabilities,
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-R58'), 0) as total_liabilities,
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-R68'), 0) as total_equity
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-L18' and (nullif(p_office, '') is null or office = p_office)), 0) as current_assets,
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-R52' and (nullif(p_office, '') is null or office = p_office)), 0) as current_liabilities,
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-R58' and (nullif(p_office, '') is null or office = p_office)), 0) as total_liabilities,
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = m.yearmonth and statement_type = 'BS' and account_code = 'BS-R68' and (nullif(p_office, '') is null or office = p_office)), 0) as total_equity
     from months m
   )
   select jsonb_agg(to_jsonb(x) order by x.yearmonth) into v_result
@@ -113,11 +124,15 @@ begin
 end;
 $$;
 
--- 예산 대비 실적 요약 (한 달, PL 비소계 계정 기준)
+-- 목표영업이익/예산 달성 요약 (한 달, 지점 기준). 기존 "예산 대비 실적"(PL 계정별 비교)을
+-- 대체합니다: 목표영업이익 달성률(예산관리 bgt_target_profit vs 회계관리 PL_KR 799999)과
+-- 일반관리비 예산 진행현황(예산관리 bgt_ga_lines budget vs actual)만 표기합니다.
+-- p_office가 비어있으면 법인 전체(전 지점 합산), 지정하면 그 지점만.
 create or replace function get_budget_variance_summary(
   p_access_key text,
   p_corp text,
-  p_yearmonth text
+  p_yearmonth text,
+  p_office text default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -127,38 +142,38 @@ declare
   v_role text;
   v_branch_scope text;
   v_corp text;
-  v_total_budget numeric;
-  v_total_actual numeric;
-  v_over jsonb;
+  v_target numeric;
+  v_actual_profit numeric;
+  v_ga_budget numeric;
+  v_ga_actual numeric;
 begin
   select role, branch_scope into v_role, v_branch_scope from verify_access_key(p_access_key);
   v_corp := coalesce(v_branch_scope, p_corp);
 
-  select coalesce(sum(coalesce(b.amount_cny, 0)), 0), coalesce(sum(coalesce(act.amount_cny, 0)), 0)
-    into v_total_budget, v_total_actual
-  from acct_accounts a
-  left join bgt_budget_lines b on b.corp = v_corp and b.yearmonth = p_yearmonth and b.account_code = a.code
-  left join acct_statement_lines act on act.corp = v_corp and act.yearmonth = p_yearmonth
-    and act.statement_type = 'PL' and act.account_code = a.code
-  where a.statement_type = 'PL' and a.active = true and a.is_subtotal = false;
+  select coalesce(sum(target_operating_profit_cny), 0) into v_target
+  from bgt_target_profit
+  where corp = v_corp and yearmonth = p_yearmonth and (nullif(p_office, '') is null or office = p_office);
 
-  select coalesce(jsonb_agg(to_jsonb(x) order by x."accountCode"), '[]'::jsonb) into v_over
-  from (
-    select a.code as "accountCode", a.name_ko as "nameKo", a.name_zh as "nameZh",
-           coalesce(b.amount_cny, 0) as "budgetCny", coalesce(act.amount_cny, 0) as "actualCny"
-    from acct_accounts a
-    left join bgt_budget_lines b on b.corp = v_corp and b.yearmonth = p_yearmonth and b.account_code = a.code
-    left join acct_statement_lines act on act.corp = v_corp and act.yearmonth = p_yearmonth
-      and act.statement_type = 'PL' and act.account_code = a.code
-    where a.statement_type = 'PL' and a.active = true and a.is_subtotal = false
-      and coalesce(b.amount_cny, 0) > 0 and coalesce(act.amount_cny, 0) > coalesce(b.amount_cny, 0)
-  ) x;
+  select coalesce(sum(amount_cny), 0) into v_actual_profit
+  from acct_statement_lines
+  where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '799999'
+    and (nullif(p_office, '') is null or office = p_office);
+
+  select coalesce(sum(fixed_cny + variable_cny), 0) into v_ga_budget
+  from bgt_ga_lines
+  where corp = v_corp and yearmonth = p_yearmonth and kind = 'budget' and (nullif(p_office, '') is null or office = p_office);
+
+  select coalesce(sum(fixed_cny + variable_cny), 0) into v_ga_actual
+  from bgt_ga_lines
+  where corp = v_corp and yearmonth = p_yearmonth and kind = 'actual' and (nullif(p_office, '') is null or office = p_office);
 
   return jsonb_build_object(
-    'totalBudgetCny', v_total_budget,
-    'totalActualCny', v_total_actual,
-    'achievementPct', case when v_total_budget = 0 then null else round(v_total_actual / v_total_budget * 100, 1) end,
-    'overAccounts', v_over
+    'targetProfitCny', v_target,
+    'actualProfitCny', v_actual_profit,
+    'profitAchievementPct', case when v_target = 0 then null else round(v_actual_profit / v_target * 100, 1) end,
+    'gaBudgetCny', v_ga_budget,
+    'gaActualCny', v_ga_actual,
+    'gaAchievementPct', case when v_ga_budget = 0 then null else round(v_ga_actual / v_ga_budget * 100, 1) end
   );
 end;
 $$;
@@ -204,7 +219,9 @@ end;
 $$;
 
 -- 목표실적 관리표: 법인 산하 지점별 목표영업이익(예산관리) 대비 실적(회계관리 PL_KR) +
--- 인원수/접대비(회계관리 acct_pl_kr_extra) + 출장비(예산관리 bgt_ga_lines 실적) 종합.
+-- 인원수/접대비/출장비(회계관리 acct_pl_kr_extra) 종합. p_yearmonth가 속한 해의 1월부터
+-- p_yearmonth까지 누계로 집계합니다 (예: 2026-03이면 1~3월 누계). 흐름지표(매출/이익 등)는
+-- 합산, 인원수는 값이 입력된 달의 평균을 사용합니다.
 -- ⚠ 이 함수도 계정코드를 하드코딩합니다: 매출액 500000, 매출원가 600000, 매출이익 699999,
 -- 관리비 700000, 영업이익(한국식) 799999, 당기순이익 999999 (전부 PL_KR statement_type).
 create or replace function get_target_performance_report(
@@ -220,20 +237,24 @@ declare
   v_role text;
   v_branch_scope text;
   v_corp text;
+  v_year text;
+  v_start text;
   v_offices text[];
   v_result jsonb := '[]'::jsonb;
   v_total jsonb;
 begin
   select role, branch_scope into v_role, v_branch_scope from verify_access_key(p_access_key);
   v_corp := coalesce(v_branch_scope, p_corp);
+  v_year := left(p_yearmonth, 4);
+  v_start := v_year || '-01';
 
   select array_agg(distinct o) into v_offices
   from (
-    select office as o from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL_KR'
+    select office as o from acct_statement_lines where corp = v_corp and statement_type = 'PL_KR' and yearmonth between v_start and p_yearmonth
     union
-    select office as o from acct_pl_kr_extra where corp = v_corp and yearmonth = p_yearmonth
+    select office as o from acct_pl_kr_extra where corp = v_corp and yearmonth between v_start and p_yearmonth
     union
-    select office as o from bgt_target_profit where corp = v_corp and yearmonth = p_yearmonth
+    select office as o from bgt_target_profit where corp = v_corp and yearmonth between v_start and p_yearmonth
   ) s;
 
   select jsonb_agg(to_jsonb(x) order by x.office)
@@ -241,20 +262,21 @@ begin
   from (
     select
       o.office,
-      coalesce((select target_operating_profit_cny from bgt_target_profit where corp = v_corp and office = o.office and yearmonth = p_yearmonth), 0) as "targetOperatingProfitCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '500000'), 0) as "revenueCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '600000'), 0) as "costOfSalesCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '699999'), 0) as "salesProfitCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '700000'), 0) as "gaExpenseCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '799999'), 0) as "operatingProfitCny",
-      coalesce((select amount_cny from acct_statement_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and statement_type = 'PL_KR' and account_code = '999999'), 0) as "netProfitCny",
-      (select headcount from acct_pl_kr_extra where corp = v_corp and office = o.office and yearmonth = p_yearmonth) as "headcount",
-      coalesce((select entertainment_cny from acct_pl_kr_extra where corp = v_corp and office = o.office and yearmonth = p_yearmonth), 0) as "entertainmentCny",
-      coalesce((select sum(fixed_cny + variable_cny) from bgt_ga_lines where corp = v_corp and office = o.office and yearmonth = p_yearmonth and category = 'travel' and kind = 'actual'), 0) as "travelCny"
+      coalesce((select sum(target_operating_profit_cny) from bgt_target_profit where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth), 0) as "targetOperatingProfitCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth and statement_type = 'PL_KR' and account_code = '500000'), 0) as "revenueCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth and statement_type = 'PL_KR' and account_code = '600000'), 0) as "costOfSalesCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth and statement_type = 'PL_KR' and account_code = '699999'), 0) as "salesProfitCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth and statement_type = 'PL_KR' and account_code = '700000'), 0) as "gaExpenseCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth and statement_type = 'PL_KR' and account_code = '799999'), 0) as "operatingProfitCny",
+      coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth and statement_type = 'PL_KR' and account_code = '999999'), 0) as "netProfitCny",
+      (select round(avg(headcount)) from acct_pl_kr_extra where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth and headcount is not null) as "headcount",
+      coalesce((select sum(entertainment_cny) from acct_pl_kr_extra where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth), 0) as "entertainmentCny",
+      coalesce((select sum(travel_cny) from acct_pl_kr_extra where corp = v_corp and office = o.office and yearmonth between v_start and p_yearmonth), 0) as "travelCny"
     from (select unnest(coalesce(v_offices, array[]::text[])) as office) o
   ) x;
 
-  -- 합계 행: 비율/생산성은 개별 지점 비율의 평균이 아니라 합산된 원본 수치로 재계산
+  -- 합계 행: 비율/생산성은 개별 지점 비율의 평균이 아니라 합산된 원본 수치로 재계산.
+  -- 인원수는 지점별 평균의 합(=전체 지점 합산 인원수 근사치)을 사용합니다.
   select jsonb_build_object(
     'office', null,
     'targetOperatingProfitCny', coalesce(sum((r->>'targetOperatingProfitCny')::numeric), 0),
@@ -302,19 +324,19 @@ begin
 
   foreach v_corp in array perf_all_corps()
   loop
-    select coalesce(amount_cny, 0) into v_revenue from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL' and account_code = '500000';
-    select coalesce(amount_cny, 0) into v_op from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL' and account_code = '799999';
-    select coalesce(amount_cny, 0) into v_net from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL' and account_code = '999999';
+    select coalesce(sum(amount_cny), 0) into v_revenue from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL' and account_code = '500000';
+    select coalesce(sum(amount_cny), 0) into v_op from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL' and account_code = '799999';
+    select coalesce(sum(amount_cny), 0) into v_net from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'PL' and account_code = '999999';
 
-    select case when coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R68'), 0) = 0
+    select case when coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R68'), 0) = 0
                 then null
-                else round(coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R58'), 0)
-                     / (select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R68') * 100, 1)
+                else round(coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R58'), 0)
+                     / (select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R68') * 100, 1)
            end into v_debt;
-    select case when coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R52'), 0) = 0
+    select case when coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R52'), 0) = 0
                 then null
-                else round(coalesce((select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-L18'), 0)
-                     / (select amount_cny from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R52') * 100, 1)
+                else round(coalesce((select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-L18'), 0)
+                     / (select sum(amount_cny) from acct_statement_lines where corp = v_corp and yearmonth = p_yearmonth and statement_type = 'BS' and account_code = 'BS-R52') * 100, 1)
            end into v_current;
 
     v_budget := get_budget_variance_summary(p_access_key, v_corp, p_yearmonth);
@@ -327,7 +349,7 @@ begin
       'netMarginPct', case when v_revenue = 0 then null else round(v_net / v_revenue * 100, 1) end,
       'debtRatioPct', v_debt,
       'currentRatioPct', v_current,
-      'achievementPct', v_budget->'achievementPct',
+      'achievementPct', v_budget->'profitAchievementPct',
       'cashChangePct', v_fund->'cashChangePct',
       'loanBalanceCny', v_fund->'totalLoanBalanceCny'
     ));
@@ -338,9 +360,9 @@ end;
 $$;
 
 grant execute on function perf_all_corps() to anon, authenticated;
-grant execute on function get_profitability_series(text, text, text, integer) to anon, authenticated;
-grant execute on function get_stability_series(text, text, text, integer) to anon, authenticated;
-grant execute on function get_budget_variance_summary(text, text, text) to anon, authenticated;
+grant execute on function get_profitability_series(text, text, text, integer, text) to anon, authenticated;
+grant execute on function get_stability_series(text, text, text, integer, text) to anon, authenticated;
+grant execute on function get_budget_variance_summary(text, text, text, text) to anon, authenticated;
 grant execute on function get_fund_risk_summary(text, text, text) to anon, authenticated;
 grant execute on function get_target_performance_report(text, text, text) to anon, authenticated;
 grant execute on function get_performance_aggregate(text, text) to anon, authenticated;
