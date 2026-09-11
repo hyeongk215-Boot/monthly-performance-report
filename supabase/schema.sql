@@ -376,7 +376,7 @@ begin
 
   if p_period_type = 'annual' then
     v_row := perf_target_bucket(v_corp, v_office, p_year || '-01', p_year || '-' || lpad(p_end_month, 2, '0'));
-    v_result := jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb(p_year || '년')));
+    v_result := jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb((p_year || '년')::text)));
   elsif p_period_type = 'half' then
     for i in 1..ceil(v_end_num / 6.0)::int loop
       v_bucket_start := (i - 1) * 6 + 1;
@@ -384,7 +384,7 @@ begin
       v_start_ym := p_year || '-' || lpad(v_bucket_start::text, 2, '0');
       v_end_ym := p_year || '-' || lpad(v_bucket_end::text, 2, '0');
       v_row := perf_target_bucket(v_corp, v_office, v_start_ym, v_end_ym);
-      v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb(case when i = 1 then '상반기' else '하반기' end)));
+      v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb((case when i = 1 then '상반기' else '하반기' end)::text)));
     end loop;
   elsif p_period_type = 'quarter' then
     for i in 1..ceil(v_end_num / 3.0)::int loop
@@ -393,18 +393,18 @@ begin
       v_start_ym := p_year || '-' || lpad(v_bucket_start::text, 2, '0');
       v_end_ym := p_year || '-' || lpad(v_bucket_end::text, 2, '0');
       v_row := perf_target_bucket(v_corp, v_office, v_start_ym, v_end_ym);
-      v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb(i || '분기')));
+      v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb((i || '분기')::text)));
     end loop;
   else
     for i in 1..v_end_num loop
       v_start_ym := p_year || '-' || lpad(i::text, 2, '0');
       v_row := perf_target_bucket(v_corp, v_office, v_start_ym, v_start_ym);
-      v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb(i || '월')));
+      v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb((i || '월')::text)));
     end loop;
   end if;
 
   v_row := perf_target_bucket(v_corp, v_office, p_year || '-01', p_year || '-' || lpad(p_end_month, 2, '0'));
-  v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb('합계')));
+  v_result := v_result || jsonb_build_array(jsonb_set(v_row, '{label}', to_jsonb('합계'::text)));
 
   return jsonb_build_object('corp', v_corp, 'office', v_office, 'periods', v_result);
 end;
