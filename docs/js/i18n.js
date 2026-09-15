@@ -3,6 +3,7 @@ window.I18N = {
     appTitle: "실적분석 - 중국법인 재무실적 종합 분석 시스템",
     langName: "한국어",
     navAdmin: "본사용: 관리자 화면",
+    navDashboard: "← 통합 대시보드",
     backBtn: "← 뒤로",
 
     indexHeading: "실적분석 조회",
@@ -130,6 +131,7 @@ window.I18N = {
     appTitle: "业绩分析 - 中国法人财务业绩综合分析系统",
     langName: "中文",
     navAdmin: "总部用：管理员页面",
+    navDashboard: "← 综合仪表盘",
     backBtn: "← 返回",
 
     indexHeading: "业绩分析查询",
