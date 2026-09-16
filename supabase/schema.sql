@@ -576,3 +576,48 @@ grant execute on function get_financial_ratios(text, text, text) to anon, authen
 grant execute on function get_target_performance_series(text, text, text, text, text, text) to anon, authenticated;
 grant execute on function get_target_performance_group(text, text, text, text, text) to anon, authenticated;
 grant execute on function get_performance_aggregate(text, text) to anon, authenticated;
+
+-- ⚠ 추가분(회계 상세분석 insights.html 전용, 기존 함수는 변경하지 않음): 예산관리의
+-- bgt_ga_lines(일반관리비 11개 카테고리 예산/실적)를 기간 합산해서 카테고리별로 반환합니다.
+-- 예산관리의 get_ga_lines()는 한 달치만 반환하므로, 분기/연간 합산을 위해 이 모듈에서
+-- 직접 조회하는 별도 함수를 둡니다. p_office가 비어있으면 법인 전체 합산, office_scope가
+-- 있으면 강제.
+create or replace function get_ga_breakdown(
+  p_access_key text,
+  p_corp text,
+  p_office text,
+  p_start_ym text,
+  p_end_ym text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_role text;
+  v_branch_scope text;
+  v_office_scope text;
+  v_corp text;
+  v_office text;
+  v_result jsonb;
+begin
+  select role, branch_scope, office_scope into v_role, v_branch_scope, v_office_scope from verify_access_key(p_access_key);
+  v_corp := coalesce(v_branch_scope, p_corp);
+  v_office := coalesce(v_office_scope, p_office);
+
+  select jsonb_agg(to_jsonb(x) order by x.category) into v_result
+  from (
+    select category,
+      coalesce(sum(fixed_cny + variable_cny) filter (where kind = 'budget'), 0) as "budgetCny",
+      coalesce(sum(fixed_cny + variable_cny) filter (where kind = 'actual'), 0) as "actualCny"
+    from bgt_ga_lines
+    where corp = v_corp and yearmonth between p_start_ym and p_end_ym
+      and (nullif(v_office, '') is null or office = v_office)
+    group by category
+  ) x;
+
+  return coalesce(v_result, '[]'::jsonb);
+end;
+$$;
+
+grant execute on function get_ga_breakdown(text, text, text, text, text) to anon, authenticated;
