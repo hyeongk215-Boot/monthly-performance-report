@@ -21,9 +21,11 @@
   var waterfallChart = null;
   var gaBarChart = null;
   var gaDonutChart = null;
+  var stabilityChart = null;
   var lastGaRows = null;
   var lastBucket = null;
   var lastPrevBucket = null;
+  var rawStabilitySeries = [];
 
   function showToast(msg) {
     var el = document.getElementById("toast");
@@ -67,6 +69,7 @@
       applyTheme(!isDark());
       if (lastBucket) renderWaterfall(lastBucket, lastPrevBucket);
       if (lastGaRows) renderGaCharts(lastGaRows);
+      renderStability();
     });
   }
 
@@ -339,6 +342,75 @@
     }).catch(function () { showToast(t("fetchFail")); });
   }
 
+  // ===== 재무안정성 추이 (위험 임계 밴드) =====
+  // 부채비율/유동비율은 저량지표이므로 aggregateStockSeries로 기간말 값만 사용합니다.
+  function renderStability() {
+    var el = document.getElementById("stabilityWrap");
+    if (!stabilityChart) stabilityChart = echarts.init(el);
+
+    var rows = window.aggregateStockSeries(rawStabilitySeries, currentPeriod, ["debtRatioPct", "currentRatioPct"]);
+    if (!rows.length) {
+      stabilityChart.clear();
+      return;
+    }
+
+    var axisColor = themeVar("--ins-text-secondary");
+    var borderColor = themeVar("--ins-border");
+    var labels = rows.map(function (r) { return r.yearmonth; });
+    var debtData = rows.map(function (r) { return r.debtRatioPct === null || r.debtRatioPct === undefined ? null : Number(r.debtRatioPct); });
+    var currentData = rows.map(function (r) { return r.currentRatioPct === null || r.currentRatioPct === undefined ? null : Number(r.currentRatioPct); });
+
+    stabilityChart.setOption({
+      tooltip: { trigger: "axis", valueFormatter: function (v) { return v === null ? t("noData") : Number(v).toFixed(1) + "%"; } },
+      legend: { data: [t("colDebtRatio"), t("colCurrentRatio")], top: 0, textStyle: { color: axisColor, fontSize: 11 } },
+      grid: { left: 56, right: 24, top: 34, bottom: 24 },
+      xAxis: { type: "category", data: labels, axisLine: { lineStyle: { color: borderColor } }, axisLabel: { color: axisColor, fontSize: 10 }, axisTick: { show: false } },
+      yAxis: {
+        type: "value", axisLine: { show: false }, splitLine: { lineStyle: { color: borderColor, type: "dashed" } },
+        axisLabel: { color: axisColor, fontSize: 10, formatter: "{value}%" }
+      },
+      series: [
+        {
+          name: t("colDebtRatio"), type: "line", smooth: true, symbolSize: 5, connectNulls: false,
+          data: debtData, itemStyle: { color: "#dc2626" }, lineStyle: { width: 2 },
+          markArea: {
+            silent: true, itemStyle: { color: "rgba(220, 38, 38, 0.10)" },
+            data: [[{ yAxis: 200 }, { yAxis: "max" }]]
+          },
+          markLine: {
+            silent: true, symbol: "none",
+            label: { formatter: t("debtRiskLine"), color: axisColor, fontSize: 10, position: "insideEndTop" },
+            lineStyle: { color: "#dc2626", type: "dashed" },
+            data: [{ yAxis: 200 }]
+          }
+        },
+        {
+          name: t("colCurrentRatio"), type: "line", smooth: true, symbolSize: 5, connectNulls: false,
+          data: currentData, itemStyle: { color: "#4f46e5" }, lineStyle: { width: 2 },
+          markLine: {
+            silent: true, symbol: "none",
+            label: { formatter: t("currentSafeLine"), color: axisColor, fontSize: 10, position: "insideEndBottom" },
+            lineStyle: { color: "#4f46e5", type: "dashed" },
+            data: [{ yAxis: 100 }]
+          }
+        }
+      ]
+    }, true);
+  }
+
+  function loadStability() {
+    var client = window.getSupabaseClient();
+    if (!client) { showToast(t("fetchFail")); return; }
+    client.rpc("get_stability_series", {
+      p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth,
+      p_months_back: 12, p_office: currentOffice || null
+    }).then(function (res) {
+      if (res.error) throw res.error;
+      rawStabilitySeries = res.data || [];
+      renderStability();
+    }).catch(function () { showToast(t("fetchFail")); });
+  }
+
   // ===== 필터/토글 바인딩 =====
   function bindPeriodToggle() {
     document.getElementById("periodToggle").addEventListener("click", function (e) {
@@ -349,6 +421,7 @@
       currentPeriod = btn.dataset.period;
       loadWaterfall();
       loadGaBreakdown();
+      renderStability(); // 저량지표라 재조회 없이 기간 재집계만 하면 됩니다.
     });
   }
 
@@ -357,6 +430,7 @@
       currentOffice = e.target.value;
       loadWaterfall();
       loadGaBreakdown();
+      loadStability();
     });
   }
 
@@ -364,6 +438,7 @@
     if (waterfallChart) waterfallChart.resize();
     if (gaBarChart) gaBarChart.resize();
     if (gaDonutChart) gaDonutChart.resize();
+    if (stabilityChart) stabilityChart.resize();
   }
 
   // ===== PDF / PPT 내보내기 (화면에 보이는 색상을 그대로 캡처) =====
@@ -428,6 +503,7 @@
     renderOfficeSelect();
     loadWaterfall();
     loadGaBreakdown();
+    loadStability();
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -443,6 +519,7 @@
       renderOfficeSelect();
       loadWaterfall();
       if (lastGaRows) { renderGaTable(lastGaRows); renderGaCharts(lastGaRows); }
+      renderStability();
     });
   });
 })();

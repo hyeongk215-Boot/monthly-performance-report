@@ -43,7 +43,12 @@
     exportPdf: "PDF로 저장",
     exportPpt: "PPT로 저장",
     exportPreparing: "내보내기 준비 중입니다...",
-    exportFail: "내보내기에 실패했습니다."
+    exportFail: "내보내기에 실패했습니다.",
+
+    stabilityChartHeading: "재무안정성 추이",
+    stabilityChartDesc: "부채비율이 붉은 밴드(200% 초과)에 들어가거나 유동비율이 100% 아래로 내려가면 위험 신호입니다.",
+    debtRiskLine: "위험 200%",
+    currentSafeLine: "안전 100%"
   });
 
   Object.assign(window.I18N.zh, {
@@ -88,6 +93,11 @@
     exportPdf: "导出为PDF",
     exportPpt: "导出为PPT",
     exportPreparing: "正在准备导出...",
-    exportFail: "导出失败。"
+    exportFail: "导出失败。",
+
+    stabilityChartHeading: "财务稳定性趋势",
+    stabilityChartDesc: "资产负债率进入红色区间（超过200%）或流动比率低于100%即为风险信号。",
+    debtRiskLine: "风险 200%",
+    currentSafeLine: "安全 100%"
   });
 })();
