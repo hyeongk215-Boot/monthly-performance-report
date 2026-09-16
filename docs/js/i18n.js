@@ -1,5 +1,12 @@
 window.I18N = {
   ko: {
+    navInsights: "회계 상세분석",
+    moduleName: "실적분석",
+    navSecMain: "조회",
+    navSecAdmin: "관리",
+    navQuery: "실적 조회",
+    navPerfView: "실적 개요",
+    navTargetTable: "목표실적 관리표",
     appTitle: "실적분석 - 중국법인 재무실적 종합 분석 시스템",
     langName: "한국어",
     navAdmin: "본사용: 관리자 화면",
@@ -128,6 +135,13 @@ window.I18N = {
     fileNamePrefix: "실적분석"
   },
   zh: {
+    navInsights: "会计详细分析",
+    moduleName: "业绩分析",
+    navSecMain: "查询",
+    navSecAdmin: "管理",
+    navQuery: "业绩查询",
+    navPerfView: "业绩概览",
+    navTargetTable: "目标业绩管理表",
     appTitle: "业绩分析 - 中国法人财务业绩综合分析系统",
     langName: "中文",
     navAdmin: "总部用：管理员页面",

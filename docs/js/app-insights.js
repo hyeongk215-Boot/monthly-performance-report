@@ -56,14 +56,17 @@
   }
   var MOON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
   var SUN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+  // 다크모드 상태는 다른 19개 페이지(common.js)와 같은 localStorage 키 "erpTheme"을 공유해서,
+  // 어느 화면에서 켜든 사이트 전체가 같은 테마로 유지되도록 합니다.
   function applyTheme(dark) {
     document.getElementById("insightsApp").classList.toggle("dark", dark);
-    localStorage.setItem("insightsDark", dark ? "1" : "0");
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    localStorage.setItem("erpTheme", dark ? "dark" : "light");
     var btn = document.getElementById("darkToggle");
     if (btn) btn.innerHTML = dark ? SUN_SVG : MOON_SVG;
   }
   function bindDarkToggle() {
-    var saved = localStorage.getItem("insightsDark") === "1";
+    var saved = localStorage.getItem("erpTheme") === "dark";
     applyTheme(saved);
     document.getElementById("darkToggle").addEventListener("click", function () {
       applyTheme(!isDark());
