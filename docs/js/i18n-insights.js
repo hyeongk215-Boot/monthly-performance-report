@@ -2,9 +2,14 @@
 // 이 파일에서 Object.assign으로 새 키만 병합합니다. insights.html에서만 로드됩니다.
 (function () {
   Object.assign(window.I18N.ko, {
-    navInsights: "회계 상세분석",
-    insightsHeading: "회계 상세분석",
+    navInsights: "재무지표 분석",
+    insightsHeading: "재무지표 분석",
     insightsDesc: "손익 구조와 판관비 세부 내역을 회계관리·예산관리에 이미 입력된 데이터로 분석합니다.",
+    insightsCorpFixed: "YJC 포워딩 전용",
+    insightsCorpFixedNote: "이 화면은 YJC 포워딩 법인만 분석합니다. 다른 법인은 「실적 개요」 또는 「경영지표」에서 조회하세요.",
+    insightsDenied: "열람 권한이 없습니다",
+    insightsDeniedDesc: "재무지표 분석은 관리자(system_admin)와 본사 회계(finance) 접근키만 열람할 수 있습니다. 지점 접근키로는 조회할 수 없습니다.",
+    insightsDeniedBack: "← 실적 개요로 이동",
 
     waterfallHeading: "손익 구조 (한국식 기준)",
     waterfallDesc: "매출 → 매출원가 → 매출이익 → 판관비 → 영업이익 5단계 흐름입니다.",
@@ -37,7 +42,6 @@
     catSystem: "시스템비",
     catBankFee: "은행수수료",
 
-    insNavOverview: "실적 개요",
     statGaExecPct: "판관비 집행률",
     vsPrevPeriod: "전기대비 {pct}",
     exportPdf: "PDF로 저장",
@@ -52,9 +56,14 @@
   });
 
   Object.assign(window.I18N.zh, {
-    navInsights: "会计详细分析",
-    insightsHeading: "会计详细分析",
+    navInsights: "财务指标分析",
+    insightsHeading: "财务指标分析",
     insightsDesc: "基于会计管理·预算管理中已录入的数据，分析损益结构和管理费用明细。",
+    insightsCorpFixed: "仅限 YJC 货代",
+    insightsCorpFixedNote: "本页面仅分析 YJC 货代法人。其他法人请在「业绩概览」或「经营指标」中查询。",
+    insightsDenied: "无查看权限",
+    insightsDeniedDesc: "财务指标分析仅限管理员（system_admin）和总部会计（finance）接入密钥查看，分公司接入密钥无法查询。",
+    insightsDeniedBack: "← 前往业绩概览",
 
     waterfallHeading: "损益结构（韩式口径）",
     waterfallDesc: "销售额 → 销售成本 → 销售利润 → 管理费用 → 营业利润 5个阶段。",
@@ -87,7 +96,6 @@
     catSystem: "系统费",
     catBankFee: "银行手续费",
 
-    insNavOverview: "业绩概览",
     statGaExecPct: "管理费用执行率",
     vsPrevPeriod: "较上期 {pct}",
     exportPdf: "导出为PDF",

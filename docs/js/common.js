@@ -67,6 +67,22 @@ window.downloadWorkbook = function (wb, filename) {
   XLSX.writeFile(wb, filename);
 };
 
+// ===== 재무지표 분석(insights.html) 열람 권한 =====
+// 이 화면은 본사 전용입니다. 관리자(system_admin)와 본사 회계(finance) 접근키만 열람할 수 있고,
+// 지점 접근키(branch_*)는 메뉴 자체가 보이지 않습니다. 서버의 get_ga_breakdown()에도 같은
+// 검사가 들어 있어서, 주소를 직접 입력해도 데이터는 내려가지 않습니다.
+window.INSIGHTS_ROLES = ["system_admin", "finance"];
+window.canViewInsights = function (ctx) {
+  ctx = ctx || window.loadContext();
+  return !!(ctx && window.INSIGHTS_ROLES.indexOf(ctx.role) !== -1);
+};
+document.addEventListener("DOMContentLoaded", function () {
+  if (window.canViewInsights()) return;
+  document.querySelectorAll('[data-nav="insights"]').forEach(function (el) {
+    el.style.display = "none";
+  });
+});
+
 // ===== 기간(월/분기/연) 집계 헬퍼 =====
 // "YYYY-MM" -> 분기 라벨 "YYYY-Qn" 또는 연 라벨 "YYYY"
 window.periodLabel = function (yearmonth, unit) {

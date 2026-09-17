@@ -577,11 +577,16 @@ grant execute on function get_target_performance_series(text, text, text, text, 
 grant execute on function get_target_performance_group(text, text, text, text, text) to anon, authenticated;
 grant execute on function get_performance_aggregate(text, text) to anon, authenticated;
 
--- ⚠ 추가분(회계 상세분석 insights.html 전용, 기존 함수는 변경하지 않음): 예산관리의
+-- ⚠ 추가분(재무지표 분석 insights.html 전용, 기존 함수는 변경하지 않음): 예산관리의
 -- bgt_ga_lines(일반관리비 11개 카테고리 예산/실적)를 기간 합산해서 카테고리별로 반환합니다.
 -- 예산관리의 get_ga_lines()는 한 달치만 반환하므로, 분기/연간 합산을 위해 이 모듈에서
 -- 직접 조회하는 별도 함수를 둡니다. p_office가 비어있으면 법인 전체 합산, office_scope가
 -- 있으면 강제.
+--
+-- ⚠ 열람 제한 2가지 (화면단 차단과 별개로 서버에서도 강제합니다):
+--   1) 역할: 관리자(system_admin)와 본사 회계(finance)만 열람. 지점 접근키(branch_*)는 차단.
+--   2) 법인: YJC 포워딩 고정. 관리자라도 다른 법인은 조회할 수 없으므로 p_corp는 무시합니다.
+--      (파라미터는 호출부 호환을 위해 시그니처에 그대로 남겨둡니다.)
 create or replace function get_ga_breakdown(
   p_access_key text,
   p_corp text,
@@ -602,7 +607,13 @@ declare
   v_result jsonb;
 begin
   select role, branch_scope, office_scope into v_role, v_branch_scope, v_office_scope from verify_access_key(p_access_key);
-  v_corp := coalesce(v_branch_scope, p_corp);
+
+  -- v_role이 null이면 not in 이 null이 되어 통과해버리므로 명시적으로 함께 막습니다.
+  if v_role is null or v_role not in ('system_admin', 'finance') then
+    raise exception 'forbidden_role';
+  end if;
+
+  v_corp := 'YJC 포워딩';
   v_office := coalesce(v_office_scope, p_office);
 
   select jsonb_agg(to_jsonb(x) order by x.category) into v_result

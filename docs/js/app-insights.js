@@ -5,6 +5,10 @@
     return;
   }
 
+  // 이 화면은 YJC 포워딩 법인만 분석합니다. 접속한 접근키의 법인이 무엇이든(관리자 포함) 여기서
+  // 고정하며, 서버의 get_ga_breakdown()도 같은 값으로 강제하므로 다른 법인은 조회되지 않습니다.
+  var INSIGHTS_CORP = "YJC 포워딩";
+
   var CATEGORY_ORDER = [
     "wage", "welfare", "entertainment", "travel", "depreciation",
     "rent", "office_ops", "vehicle", "consulting", "system", "bank_fee"
@@ -17,7 +21,7 @@
   };
 
   var currentPeriod = "month";
-  var currentOffice = ctx.office || "";
+  var currentOffice = ctx.officeScope || "";
   var waterfallChart = null;
   var gaBarChart = null;
   var gaDonutChart = null;
@@ -49,63 +53,42 @@
     return t(CATEGORY_I18N_KEY[cat] || cat);
   }
 
-  // ===== 테마(다크모드) =====
-  function isDark() { return document.getElementById("insightsApp").classList.contains("dark"); }
+  // ===== 테마 =====
+  // 다크/라이트 전환과 토글 버튼은 common.js가 다른 화면과 똑같이 처리합니다. 여기서는 전환
+  // 이벤트를 받아 ECharts 색만 다시 칠합니다(차트는 CSS 변수를 자동으로 따르지 않기 때문).
   function themeVar(name) {
-    return getComputedStyle(document.getElementById("insightsApp")).getPropertyValue(name).trim();
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
-  var MOON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-  var SUN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
-  // 다크모드 상태는 다른 19개 페이지(common.js)와 같은 localStorage 키 "erpTheme"을 공유해서,
-  // 어느 화면에서 켜든 사이트 전체가 같은 테마로 유지되도록 합니다.
-  function applyTheme(dark) {
-    document.getElementById("insightsApp").classList.toggle("dark", dark);
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    localStorage.setItem("erpTheme", dark ? "dark" : "light");
-    var btn = document.getElementById("darkToggle");
-    if (btn) btn.innerHTML = dark ? SUN_SVG : MOON_SVG;
-  }
-  function bindDarkToggle() {
-    var saved = localStorage.getItem("erpTheme") === "dark";
-    applyTheme(saved);
-    document.getElementById("darkToggle").addEventListener("click", function () {
-      applyTheme(!isDark());
-      if (lastBucket) renderWaterfall(lastBucket, lastPrevBucket);
-      if (lastGaRows) renderGaCharts(lastGaRows);
-      renderStability();
-    });
-  }
-
-  // ===== 언어 토글 (사이드바 전용 버튼, i18n.js의 .lang-btn과 별개) =====
-  function bindLangButtons() {
-    document.querySelectorAll(".ins-lang-toggle").forEach(function (btn) {
-      btn.addEventListener("click", function () { window.setLang(btn.dataset.lang); });
-    });
-    function syncActive() {
-      document.querySelectorAll(".ins-lang-toggle").forEach(function (btn) {
-        btn.classList.toggle("active", btn.dataset.lang === getLang());
-      });
-    }
-    syncActive();
-    document.addEventListener("langchange", syncActive);
+  function chartColors() {
+    return {
+      accent: themeVar("--primary"),
+      danger: themeVar("--danger"),
+      ok: themeVar("--ok"),
+      budget: window.isDarkTheme() ? "#3b4463" : "#c7d2fe",
+      axis: themeVar("--muted"),
+      border: themeVar("--border"),
+      text: themeVar("--text"),
+      surface: themeVar("--card")
+    };
   }
 
   // ===== 필터 바 =====
   function renderContextBar() {
-    document.getElementById("corpChipLabel").textContent = window.corpLabel(ctx.corp);
+    document.getElementById("corpFixed").value = window.corpLabel(INSIGHTS_CORP);
     var sel = document.getElementById("ymSwitch");
-    sel.innerHTML = "";
-    window.generateYearMonths().forEach(function (ym) {
-      var o = document.createElement("option");
-      o.value = ym; o.textContent = ym;
-      sel.appendChild(o);
-    });
-    sel.value = ctx.yearmonth;
-    sel.addEventListener("change", function () {
-      ctx.yearmonth = sel.value;
-      window.saveContext(ctx);
-      loadAll();
-    });
+    if (!sel.options.length) {
+      window.generateYearMonths().forEach(function (ym) {
+        var o = document.createElement("option");
+        o.value = ym; o.textContent = ym;
+        sel.appendChild(o);
+      });
+      sel.value = ctx.yearmonth;
+      sel.addEventListener("change", function () {
+        ctx.yearmonth = sel.value;
+        window.saveContext(ctx);
+        loadAll();
+      });
+    }
   }
 
   function officesForCorp(corp) {
@@ -114,7 +97,7 @@
   }
 
   function renderOfficeSelect() {
-    var wrap = document.getElementById("officeChipWrap");
+    var wrap = document.getElementById("officeSelectWrap");
     if (ctx.officeScope) {
       wrap.style.display = "none";
       currentOffice = ctx.officeScope;
@@ -126,7 +109,7 @@
     var allOpt = document.createElement("option");
     allOpt.value = ""; allOpt.textContent = t("officeAllOption");
     sel.appendChild(allOpt);
-    officesForCorp(ctx.corp).forEach(function (item) {
+    officesForCorp(INSIGHTS_CORP).forEach(function (item) {
       var o = document.createElement("option");
       o.value = item.ko; o.textContent = window.officeLabel(item.ko);
       sel.appendChild(o);
@@ -185,7 +168,7 @@
     var bar = document.getElementById("statGaExecBar");
     var pct = execPct === null ? 0 : Math.min(execPct, 100);
     bar.style.width = pct + "%";
-    bar.style.background = (execPct !== null && execPct > 100) ? themeVar("--ins-danger") : themeVar("--ins-success");
+    bar.style.background = (execPct !== null && execPct > 100) ? themeVar("--danger") : themeVar("--ok");
   }
 
   // ===== 손익 5단계 워터폴 =====
@@ -207,24 +190,22 @@
     var ga = Number(bucket.gaExpenseCny) || 0;
     var operatingProfit = Number(bucket.operatingProfitCny) || 0;
 
+    var c = chartColors();
     var categories = [t("wfRevenue"), t("wfCost"), t("wfSalesProfit"), t("wfGaExpense"), t("wfOperatingProfit")];
     var base = [0, revenue - cost, 0, salesProfit - ga, 0];
     var value = [revenue, cost, salesProfit, ga, operatingProfit];
-    var colors = ["#4f46e5", "#dc2626", "#059669", "#dc2626", "#059669"];
-    var axisColor = themeVar("--ins-text-secondary");
-    var borderColor = themeVar("--ins-border");
-    var textColor = themeVar("--ins-text");
+    var colors = [c.accent, c.danger, c.ok, c.danger, c.ok];
 
     waterfallChart.setOption({
       tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
       grid: { left: 64, right: 20, top: 20, bottom: 30 },
-      xAxis: { type: "category", data: categories, axisLine: { lineStyle: { color: borderColor } }, axisLabel: { color: axisColor } },
-      yAxis: { type: "value", axisLine: { show: false }, axisLabel: { color: axisColor }, splitLine: { lineStyle: { color: borderColor } } },
+      xAxis: { type: "category", data: categories, axisLine: { lineStyle: { color: c.border } }, axisLabel: { color: c.axis } },
+      yAxis: { type: "value", axisLine: { show: false }, axisLabel: { color: c.axis }, splitLine: { lineStyle: { color: c.border } } },
       series: [
         { type: "bar", stack: "wf", itemStyle: { color: "transparent" }, silent: true, data: base },
         {
           type: "bar", stack: "wf", barWidth: "55%",
-          label: { show: true, position: "top", color: textColor, formatter: function (p) { return fmt(value[p.dataIndex]); } },
+          label: { show: true, position: "top", color: c.text, formatter: function (p) { return fmt(value[p.dataIndex]); } },
           data: value.map(function (v, i) { return { value: v, itemStyle: { color: colors[i], borderRadius: 3 } }; })
         }
       ]
@@ -243,7 +224,7 @@
     var year = ctx.yearmonth.slice(0, 4);
     var month = ctx.yearmonth.slice(5, 7);
     client.rpc("get_target_performance_series", {
-      p_access_key: ctx.accessKey, p_corp: ctx.corp, p_office: currentOffice || null,
+      p_access_key: ctx.accessKey, p_corp: INSIGHTS_CORP, p_office: currentOffice || null,
       p_year: year, p_end_month: month, p_period_type: periodTypeForRpc()
     }).then(function (res) {
       if (res.error) throw res.error;
@@ -287,26 +268,25 @@
   }
 
   function renderGaCharts(rows) {
+    var c = chartColors();
     var categories = CATEGORY_ORDER.map(categoryLabel);
     var budgetData = CATEGORY_ORDER.map(function (cat) { return (rows[cat] && Number(rows[cat].budgetCny)) || 0; });
     var actualData = CATEGORY_ORDER.map(function (cat) { return (rows[cat] && Number(rows[cat].actualCny)) || 0; });
-    var axisColor = themeVar("--ins-text-secondary");
-    var borderColor = themeVar("--ins-border");
 
     var barEl = document.getElementById("gaBarWrap");
     if (!gaBarChart) gaBarChart = echarts.init(barEl);
     gaBarChart.setOption({
       tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-      legend: { data: [t("colBudget"), t("colActual")], top: 0, textStyle: { color: axisColor, fontSize: 11 } },
+      legend: { data: [t("colBudget"), t("colActual")], top: 0, textStyle: { color: c.axis, fontSize: 11 } },
       grid: { left: 90, right: 20, top: 34, bottom: 20 },
       xAxis: {
-        type: "value", axisLine: { show: false }, splitLine: { lineStyle: { color: borderColor } },
-        axisLabel: { color: axisColor, fontSize: 10, formatter: function (v) { return (v / 10000).toLocaleString(undefined, { maximumFractionDigits: 0 }) + "万"; } }
+        type: "value", axisLine: { show: false }, splitLine: { lineStyle: { color: c.border } },
+        axisLabel: { color: c.axis, fontSize: 10, formatter: function (v) { return (v / 10000).toLocaleString(undefined, { maximumFractionDigits: 0 }) + "万"; } }
       },
-      yAxis: { type: "category", data: categories, axisLine: { lineStyle: { color: borderColor } }, axisLabel: { color: axisColor, fontSize: 11 } },
+      yAxis: { type: "category", data: categories, axisLine: { lineStyle: { color: c.border } }, axisLabel: { color: c.axis, fontSize: 11 } },
       series: [
-        { name: t("colBudget"), type: "bar", data: budgetData, itemStyle: { color: "#c7d2fe" } },
-        { name: t("colActual"), type: "bar", data: actualData, itemStyle: { color: "#4f46e5" } }
+        { name: t("colBudget"), type: "bar", data: budgetData, itemStyle: { color: c.budget } },
+        { name: t("colActual"), type: "bar", data: actualData, itemStyle: { color: c.accent } }
       ]
     }, true);
 
@@ -319,7 +299,7 @@
         type: "pie",
         radius: ["42%", "70%"],
         label: { show: false },
-        itemStyle: { borderColor: themeVar("--ins-surface"), borderWidth: 2 },
+        itemStyle: { borderColor: c.surface, borderWidth: 2 },
         data: CATEGORY_ORDER.map(function (cat, i) {
           return { name: categories[i], value: actualData[i] };
         }).filter(function (d) { return d.value > 0; })
@@ -332,7 +312,7 @@
     if (!client) { showToast(t("fetchFail")); return; }
     var range = periodRange();
     client.rpc("get_ga_breakdown", {
-      p_access_key: ctx.accessKey, p_corp: ctx.corp, p_office: currentOffice || null,
+      p_access_key: ctx.accessKey, p_corp: INSIGHTS_CORP, p_office: currentOffice || null,
       p_start_ym: range.start, p_end_ym: range.end
     }).then(function (res) {
       if (res.error) throw res.error;
@@ -342,7 +322,14 @@
       renderGaTable(rows);
       renderGaCharts(rows);
       renderStatCards(lastBucket, lastPrevBucket, lastGaTotals());
-    }).catch(function () { showToast(t("fetchFail")); });
+    }).catch(function (err) {
+      // 서버도 역할을 다시 검사합니다. 지점 키로 주소를 직접 열면 여기로 떨어집니다.
+      if (err && String(err.message || "").indexOf("forbidden_role") !== -1) {
+        showAccessDenied();
+        return;
+      }
+      showToast(t("fetchFail"));
+    });
   }
 
   // ===== 재무안정성 추이 (위험 임계 밴드) =====
@@ -357,43 +344,42 @@
       return;
     }
 
-    var axisColor = themeVar("--ins-text-secondary");
-    var borderColor = themeVar("--ins-border");
+    var c = chartColors();
     var labels = rows.map(function (r) { return r.yearmonth; });
     var debtData = rows.map(function (r) { return r.debtRatioPct === null || r.debtRatioPct === undefined ? null : Number(r.debtRatioPct); });
     var currentData = rows.map(function (r) { return r.currentRatioPct === null || r.currentRatioPct === undefined ? null : Number(r.currentRatioPct); });
 
     stabilityChart.setOption({
       tooltip: { trigger: "axis", valueFormatter: function (v) { return v === null ? t("noData") : Number(v).toFixed(1) + "%"; } },
-      legend: { data: [t("colDebtRatio"), t("colCurrentRatio")], top: 0, textStyle: { color: axisColor, fontSize: 11 } },
+      legend: { data: [t("colDebtRatio"), t("colCurrentRatio")], top: 0, textStyle: { color: c.axis, fontSize: 11 } },
       grid: { left: 56, right: 24, top: 34, bottom: 24 },
-      xAxis: { type: "category", data: labels, axisLine: { lineStyle: { color: borderColor } }, axisLabel: { color: axisColor, fontSize: 10 }, axisTick: { show: false } },
+      xAxis: { type: "category", data: labels, axisLine: { lineStyle: { color: c.border } }, axisLabel: { color: c.axis, fontSize: 10 }, axisTick: { show: false } },
       yAxis: {
-        type: "value", axisLine: { show: false }, splitLine: { lineStyle: { color: borderColor, type: "dashed" } },
-        axisLabel: { color: axisColor, fontSize: 10, formatter: "{value}%" }
+        type: "value", axisLine: { show: false }, splitLine: { lineStyle: { color: c.border, type: "dashed" } },
+        axisLabel: { color: c.axis, fontSize: 10, formatter: "{value}%" }
       },
       series: [
         {
           name: t("colDebtRatio"), type: "line", smooth: true, symbolSize: 5, connectNulls: false,
-          data: debtData, itemStyle: { color: "#dc2626" }, lineStyle: { width: 2 },
+          data: debtData, itemStyle: { color: c.danger }, lineStyle: { width: 2 },
           markArea: {
             silent: true, itemStyle: { color: "rgba(220, 38, 38, 0.10)" },
             data: [[{ yAxis: 200 }, { yAxis: "max" }]]
           },
           markLine: {
             silent: true, symbol: "none",
-            label: { formatter: t("debtRiskLine"), color: axisColor, fontSize: 10, position: "insideEndTop" },
-            lineStyle: { color: "#dc2626", type: "dashed" },
+            label: { formatter: t("debtRiskLine"), color: c.axis, fontSize: 10, position: "insideEndTop" },
+            lineStyle: { color: c.danger, type: "dashed" },
             data: [{ yAxis: 200 }]
           }
         },
         {
           name: t("colCurrentRatio"), type: "line", smooth: true, symbolSize: 5, connectNulls: false,
-          data: currentData, itemStyle: { color: "#4f46e5" }, lineStyle: { width: 2 },
+          data: currentData, itemStyle: { color: c.accent }, lineStyle: { width: 2 },
           markLine: {
             silent: true, symbol: "none",
-            label: { formatter: t("currentSafeLine"), color: axisColor, fontSize: 10, position: "insideEndBottom" },
-            lineStyle: { color: "#4f46e5", type: "dashed" },
+            label: { formatter: t("currentSafeLine"), color: c.axis, fontSize: 10, position: "insideEndBottom" },
+            lineStyle: { color: c.accent, type: "dashed" },
             data: [{ yAxis: 100 }]
           }
         }
@@ -405,7 +391,7 @@
     var client = window.getSupabaseClient();
     if (!client) { showToast(t("fetchFail")); return; }
     client.rpc("get_stability_series", {
-      p_access_key: ctx.accessKey, p_corp: ctx.corp, p_yearmonth: ctx.yearmonth,
+      p_access_key: ctx.accessKey, p_corp: INSIGHTS_CORP, p_yearmonth: ctx.yearmonth,
       p_months_back: 12, p_office: currentOffice || null
     }).then(function (res) {
       if (res.error) throw res.error;
@@ -419,8 +405,8 @@
     document.getElementById("periodToggle").addEventListener("click", function (e) {
       var btn = e.target.closest("button");
       if (!btn) return;
-      document.querySelectorAll("#periodToggle button").forEach(function (b) { b.classList.remove("on"); });
-      btn.classList.add("on");
+      document.querySelectorAll("#periodToggle .period-btn").forEach(function (b) { b.classList.remove("period-active"); });
+      btn.classList.add("period-active");
       currentPeriod = btn.dataset.period;
       loadWaterfall();
       loadGaBreakdown();
@@ -444,11 +430,16 @@
     if (stabilityChart) stabilityChart.resize();
   }
 
+  function redrawCharts() {
+    if (lastBucket) renderWaterfall(lastBucket, lastPrevBucket);
+    if (lastGaRows) renderGaCharts(lastGaRows);
+    renderStability();
+  }
+
   // ===== PDF / PPT 내보내기 (화면에 보이는 색상을 그대로 캡처) =====
   function captureContent() {
     var el = document.getElementById("captureArea");
-    var bg = themeVar("--ins-bg");
-    return html2canvas(el, { backgroundColor: bg, scale: 2, useCORS: true });
+    return html2canvas(el, { backgroundColor: themeVar("--bg"), scale: 2, useCORS: true });
   }
 
   function exportPdf() {
@@ -496,6 +487,12 @@
     document.getElementById("exportPptBtn").addEventListener("click", exportPpt);
   }
 
+  // ===== 열람 권한 =====
+  function showAccessDenied() {
+    document.getElementById("insightsRoot").style.display = "none";
+    document.getElementById("denyCard").style.display = "";
+  }
+
   function loadAll() {
     var client = window.getSupabaseClient();
     if (!client) {
@@ -510,12 +507,21 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    bindDarkToggle();
-    bindLangButtons();
+    document.getElementById("denyBackBtn").addEventListener("click", function () {
+      window.location.href = "view.html";
+    });
+
+    // 관리자(system_admin)·본사 회계(finance)가 아니면 여기서 끝냅니다. RPC도 호출하지 않습니다.
+    if (!window.canViewInsights(ctx)) {
+      showAccessDenied();
+      return;
+    }
+
     bindPeriodToggle();
     bindOfficeSelect();
     bindExportButtons();
     window.addEventListener("resize", resizeCharts);
+    document.addEventListener("themechange", redrawCharts);
     loadAll();
     document.addEventListener("langchange", function () {
       renderContextBar();

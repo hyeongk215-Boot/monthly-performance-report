@@ -1,6 +1,6 @@
 window.I18N = {
   ko: {
-    navInsights: "회계 상세분석",
+    navInsights: "재무지표 분석",
     moduleName: "실적분석",
     navSecMain: "조회",
     navSecAdmin: "관리",
@@ -80,9 +80,9 @@ window.I18N = {
     colTravelCny: "출장비 (CNY)",
     totalRowLabel: "합계",
 
-    navKpi: "경영지표 페이지",
+    navKpi: "경영지표",
     navTargetPerf: "목표실적 관리표 조회",
-    kpiHeading: "[본사용] 경영지표 페이지",
+    kpiHeading: "[본사용] 경영지표",
     kpiDesc: "접근키(system_admin 또는 finance)로 전체 법인의 경영지표를 비교하거나, 법인/지점을 선택해 지점 화면과 동일한 수익성·재무안정성·실적지표를 열람할 수 있습니다.",
     kpiDrilldownHeading: "법인·지점별 경영지표",
     kpiDrilldownDesc: "지점 화면과 동일한 구성입니다. 관리자는 법인/지점 제한 없이 전체를 조회할 수 있습니다.",
@@ -94,7 +94,7 @@ window.I18N = {
     wordExportBtn: "워드 보고서 출력",
     wordReportTitle: "경영지표 요약 보고서",
     adminHeading: "[본사용] 목표실적 관리표 조회",
-    adminDesc: "접근키(system_admin 또는 finance)를 입력하면 아래 목표실적 관리표를 조회/다운로드할 수 있습니다. 전체 법인 비교·재무비율은 「경영지표 페이지」에서 확인하세요.",
+    adminDesc: "접근키(system_admin 또는 finance)를 입력하면 아래 목표실적 관리표를 조회/다운로드할 수 있습니다. 전체 법인 비교·재무비율은 「경영지표」에서 확인하세요.",
     adminKeyLabel: "접근키",
     adminYm: "년월",
     adminFetch: "불러오기",
@@ -135,7 +135,7 @@ window.I18N = {
     fileNamePrefix: "실적분석"
   },
   zh: {
-    navInsights: "会计详细分析",
+    navInsights: "财务指标分析",
     moduleName: "业绩分析",
     navSecMain: "查询",
     navSecAdmin: "管理",
@@ -215,9 +215,9 @@ window.I18N = {
     colTravelCny: "差旅费 (CNY)",
     totalRowLabel: "合计",
 
-    navKpi: "经营指标页面",
+    navKpi: "经营指标",
     navTargetPerf: "目标实绩管理表查询",
-    kpiHeading: "【总部用】经营指标页面",
+    kpiHeading: "【总部用】经营指标",
     kpiDesc: "使用接入密钥（system_admin 或 finance）比较全法人经营指标，或选择法人/分公司查看与分公司页面相同的盈利能力·财务稳定性·业绩指标。",
     kpiDrilldownHeading: "按法人·分公司经营指标",
     kpiDrilldownDesc: "与分公司页面结构相同。管理员可不受限制地查询全部法人/分公司。",
@@ -229,7 +229,7 @@ window.I18N = {
     wordExportBtn: "下载Word报告",
     wordReportTitle: "经营指标摘要报告",
     adminHeading: "【总部用】目标实绩管理表查询",
-    adminDesc: "输入接入密钥（system_admin 或 finance）即可查询/下载目标实绩管理表。全法人比较·财务比率请前往「经营指标页面」查看。",
+    adminDesc: "输入接入密钥（system_admin 或 finance）即可查询/下载目标实绩管理表。全法人比较·财务比率请前往「经营指标」查看。",
     adminKeyLabel: "接入密钥",
     adminYm: "年月",
     adminFetch: "加载",
