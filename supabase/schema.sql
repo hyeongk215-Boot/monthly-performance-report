@@ -616,11 +616,14 @@ begin
   v_corp := coalesce(v_branch_scope, p_corp);
   v_office := coalesce(v_office_scope, p_office);
 
+  -- ⚠ 여기서는 coalesce(...,0)를 쓰지 않습니다. 합계가 없으면 sum(...) filter(...)가 null을
+  -- 그대로 돌려주게 두어야, 화면에서 "0원으로 입력됨"과 "아예 입력 안 됨"을 구분할 수 있습니다.
+  -- (예산 행이 아예 없는 카테고리는 budgetCny가 null, 배열에 없는 카테고리는 둘 다 미입력)
   select jsonb_agg(to_jsonb(x) order by x.category) into v_result
   from (
     select category,
-      coalesce(sum(fixed_cny + variable_cny) filter (where kind = 'budget'), 0) as "budgetCny",
-      coalesce(sum(fixed_cny + variable_cny) filter (where kind = 'actual'), 0) as "actualCny"
+      sum(fixed_cny + variable_cny) filter (where kind = 'budget') as "budgetCny",
+      sum(fixed_cny + variable_cny) filter (where kind = 'actual') as "actualCny"
     from bgt_ga_lines
     where corp = v_corp and yearmonth between p_start_ym and p_end_ym
       and (nullif(v_office, '') is null or office = v_office)

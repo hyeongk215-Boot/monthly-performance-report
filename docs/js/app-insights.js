@@ -185,11 +185,23 @@
     opBadge.textContent = t("colOperatingMarginPct") + " " + fmtPct(opMarginPct);
     opBadge.className = "ins-badge " + (opMarginPct !== null && opMarginPct >= 0 ? "success" : "danger");
 
-    var execPct = gaTotals && gaTotals.budget ? (gaTotals.actual / gaTotals.budget * 100) : null;
-    document.getElementById("statGaExecPct").textContent = fmtPct(execPct);
+    // 예산이나 실적이 미입력(null)이면 집행률은 계산하지 않고 「미입력」으로 둡니다.
+    // 미입력을 0으로 치면 집행률 0% 또는 ∞가 나와 실제 절감/초과와 섞여버립니다.
+    var budgetTotal = gaTotals ? gaTotals.budget : null;
+    var actualTotal = gaTotals ? gaTotals.actual : null;
+    var execEl = document.getElementById("statGaExecPct");
     var bar = document.getElementById("statGaExecBar");
-    var pct = execPct === null ? 0 : Math.min(execPct, 100);
-    bar.style.width = pct + "%";
+    var execPct = null;
+
+    if (budgetTotal === null || actualTotal === null) {
+      execEl.textContent = t("notEntered");
+    } else if (budgetTotal === 0) {
+      execEl.textContent = t("noData");
+    } else {
+      execPct = actualTotal / budgetTotal * 100;
+      execEl.textContent = fmtPct(execPct);
+    }
+    bar.style.width = (execPct === null ? 0 : Math.min(execPct, 100)) + "%";
     bar.style.background = (execPct !== null && execPct > 100) ? themeVar("--danger") : themeVar("--ok");
   }
 
@@ -259,12 +271,28 @@
   }
 
   // ===== 판관비 세부 구조 =====
+  // ⚠ 0원과 미입력의 구분: 서버가 합계 없는 항목을 null로 내려줍니다. 0은 "0원으로 입력됨",
+  // null은 "아예 입력 안 됨"이라 화면 표시도 합계 계산도 다르게 다룹니다.
+  function gaValue(rows, cat, key) {
+    var row = rows && rows[cat];
+    if (!row) return null;                      // 카테고리 행 자체가 없음
+    var v = row[key];
+    if (v === null || v === undefined) return null;  // 해당 kind(예산/실적) 행이 없음
+    return Number(v);
+  }
+
+  // 집행률(실적/예산)은 예산과 실적이 "둘 다" 입력된 항목만 더해서 계산합니다.
+  // 한쪽만 있는 항목을 각자 더하면 분모와 분자의 항목 구성이 달라져서
+  // (예: 예산만 있는 출장비가 분모에만 반영) 집행률이 실제보다 낮게 나옵니다.
   function lastGaTotals() {
     if (!lastGaRows) return null;
-    var budget = 0, actual = 0;
+    var budget = null, actual = null;
     CATEGORY_ORDER.forEach(function (cat) {
-      var row = lastGaRows[cat];
-      if (row) { budget += Number(row.budgetCny) || 0; actual += Number(row.actualCny) || 0; }
+      var b = gaValue(lastGaRows, cat, "budgetCny");
+      var a = gaValue(lastGaRows, cat, "actualCny");
+      if (b === null || a === null) return;
+      budget = (budget || 0) + b;
+      actual = (actual || 0) + a;
     });
     return { budget: budget, actual: actual };
   }
@@ -272,33 +300,69 @@
   function renderGaTable(rows) {
     var body = document.getElementById("gaBody");
     body.innerHTML = "";
+    var anyMissing = false;   // 예산/실적 중 하나라도 비어 있는 항목이 있는가
+    var anyPresent = false;   // 값이 하나라도 들어온 항목이 있는가
+
     CATEGORY_ORDER.forEach(function (cat) {
-      var row = rows[cat] || { budgetCny: 0, actualCny: 0 };
-      var budget = Number(row.budgetCny) || 0;
-      var actual = Number(row.actualCny) || 0;
-      var variancePct = budget ? ((actual - budget) / budget * 100) : null;
-      var badgeClass = variancePct === null ? "neutral" : (variancePct > 0 ? "danger" : "success");
-      var badgeText = variancePct === null ? t("noData") : (variancePct > 0 ? "+" : "") + variancePct.toFixed(1) + "%";
+      var budget = gaValue(rows, cat, "budgetCny");
+      var actual = gaValue(rows, cat, "actualCny");
+      if (budget === null || actual === null) anyMissing = true;
+      if (budget !== null || actual !== null) anyPresent = true;
+
+      var varianceCell;
+      if (budget === null || actual === null) {
+        // 한쪽이라도 미입력이면 증감률은 의미가 없습니다(0으로 계산하면 -100% 같은 거짓 신호).
+        varianceCell = "<span class='ins-badge neutral'>" + t("notEntered") + "</span>";
+      } else if (budget === 0) {
+        varianceCell = "<span class='ins-badge neutral'>" + t("noData") + "</span>";
+      } else {
+        var pct = (actual - budget) / budget * 100;
+        varianceCell = "<span class='ins-badge " + (pct > 0 ? "danger" : "success") + "'>" +
+          (pct > 0 ? "+" : "") + pct.toFixed(1) + "%</span>";
+      }
+
       var tr = document.createElement("tr");
+      if (budget === null && actual === null) tr.className = "ins-row-missing";
       tr.innerHTML =
         "<td>" + categoryLabel(cat) + "</td>" +
-        "<td>" + fmt(budget) + "</td>" +
-        "<td>" + fmt(actual) + "</td>" +
-        "<td><span class='ins-badge " + badgeClass + "'>" + badgeText + "</span></td>";
+        "<td>" + gaCell(budget) + "</td>" +
+        "<td>" + gaCell(actual) + "</td>" +
+        "<td>" + varianceCell + "</td>";
       body.appendChild(tr);
     });
+
+    var note = document.getElementById("gaEmptyNote");
+    if (!anyPresent) {
+      note.style.display = "";
+      note.textContent = t("gaAllEmptyNote");
+    } else if (anyMissing) {
+      note.style.display = "";
+      note.textContent = t("gaPartialNote");
+    } else {
+      note.style.display = "none";
+    }
+  }
+
+  function gaCell(v) {
+    return v === null
+      ? "<span class='ins-missing'>" + t("notEntered") + "</span>"
+      : fmt(v);
   }
 
   function renderGaCharts(rows) {
     var c = chartColors();
     var categories = CATEGORY_ORDER.map(categoryLabel);
-    var budgetData = CATEGORY_ORDER.map(function (cat) { return (rows[cat] && Number(rows[cat].budgetCny)) || 0; });
-    var actualData = CATEGORY_ORDER.map(function (cat) { return (rows[cat] && Number(rows[cat].actualCny)) || 0; });
+    // 미입력은 null로 넘겨서 막대를 아예 그리지 않습니다(0으로 넘기면 "0원 입력"처럼 보입니다).
+    var budgetData = CATEGORY_ORDER.map(function (cat) { return gaValue(rows, cat, "budgetCny"); });
+    var actualData = CATEGORY_ORDER.map(function (cat) { return gaValue(rows, cat, "actualCny"); });
 
     var barEl = document.getElementById("gaBarWrap");
     if (!gaBarChart) gaBarChart = echarts.init(barEl);
     gaBarChart.setOption({
-      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      tooltip: {
+        trigger: "axis", axisPointer: { type: "shadow" },
+        valueFormatter: function (v) { return (v === null || v === undefined) ? t("notEntered") : fmt(v); }
+      },
       legend: { data: [t("colBudget"), t("colActual")], top: 0, textStyle: { color: c.axis, fontSize: 11 } },
       grid: { left: 90, right: 20, top: 34, bottom: 20 },
       xAxis: {

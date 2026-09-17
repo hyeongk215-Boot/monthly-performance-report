@@ -40,6 +40,10 @@
 .ins-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
 .ins-table tbody tr:hover td { background: var(--surface-2); }
 
+/* 미입력 표시: 0원(실제 숫자)과 눈으로 바로 구분되도록 흐리게 + 기울임 */
+.ins-missing { color: var(--muted); font-style: italic; }
+.ins-table tr.ins-row-missing td { background: var(--surface-2); }
+
 /* 접근키에 법인이 묶여 있어 선택을 바꿀 수 없을 때 회색 처리.
    ⚠ style.css의 select 규칙(specificity 0,0,1)보다 높아야 하므로 id 선택자를 씁니다. */
 #corpSelect:disabled, #officeSelect:disabled {
