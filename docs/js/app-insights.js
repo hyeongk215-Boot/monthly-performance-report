@@ -5,10 +5,6 @@
     return;
   }
 
-  // 이 화면은 YJC 포워딩 법인만 분석합니다. 접속한 접근키의 법인이 무엇이든(관리자 포함) 여기서
-  // 고정하며, 서버의 get_ga_breakdown()도 같은 값으로 강제하므로 다른 법인은 조회되지 않습니다.
-  var INSIGHTS_CORP = "YJC 포워딩";
-
   var CATEGORY_ORDER = [
     "wage", "welfare", "entertainment", "travel", "depreciation",
     "rent", "office_ops", "vehicle", "consulting", "system", "bank_fee"
@@ -21,6 +17,9 @@
   };
 
   var currentPeriod = "month";
+  // 법인/지점은 이 화면에서만 바꿉니다. ctx.corp(로그인 컨텍스트)는 다른 화면과 공유하므로
+  // 여기서 법인을 바꿔도 「실적 개요」가 따라 바뀌지는 않습니다.
+  var currentCorp = ctx.branchScope || ctx.corp;
   var currentOffice = ctx.officeScope || "";
   var waterfallChart = null;
   var gaBarChart = null;
@@ -73,8 +72,31 @@
   }
 
   // ===== 필터 바 =====
+  function renderCorpSelect() {
+    var sel = document.getElementById("corpSelect");
+    // 관리자/본사 회계 키는 보통 branch_scope가 없어서 6개 법인이 모두 나옵니다. 혹시 법인이
+    // 묶인 키라면 그 법인만 남기고 잠급니다(서버도 branch_scope를 우선 적용합니다).
+    var locked = ctx.branchScope || "";
+    var list = window.APP_CONFIG.CORPORATIONS.filter(function (c) {
+      return !locked || c.ko === locked;
+    });
+    if (!list.length) list = window.APP_CONFIG.CORPORATIONS;
+
+    var stillValid = list.filter(function (c) { return c.ko === currentCorp; }).length > 0;
+    if (!stillValid) currentCorp = list[0].ko;
+
+    sel.innerHTML = "";
+    list.forEach(function (item) {
+      var o = document.createElement("option");
+      o.value = item.ko; o.textContent = window.corpLabel(item.ko);
+      sel.appendChild(o);
+    });
+    sel.value = currentCorp;
+    sel.disabled = !!locked;
+  }
+
   function renderContextBar() {
-    document.getElementById("corpFixed").value = window.corpLabel(INSIGHTS_CORP);
+    renderCorpSelect();
     var sel = document.getElementById("ymSwitch");
     if (!sel.options.length) {
       window.generateYearMonths().forEach(function (ym) {
@@ -109,7 +131,7 @@
     var allOpt = document.createElement("option");
     allOpt.value = ""; allOpt.textContent = t("officeAllOption");
     sel.appendChild(allOpt);
-    officesForCorp(INSIGHTS_CORP).forEach(function (item) {
+    officesForCorp(currentCorp).forEach(function (item) {
       var o = document.createElement("option");
       o.value = item.ko; o.textContent = window.officeLabel(item.ko);
       sel.appendChild(o);
@@ -224,7 +246,7 @@
     var year = ctx.yearmonth.slice(0, 4);
     var month = ctx.yearmonth.slice(5, 7);
     client.rpc("get_target_performance_series", {
-      p_access_key: ctx.accessKey, p_corp: INSIGHTS_CORP, p_office: currentOffice || null,
+      p_access_key: ctx.accessKey, p_corp: currentCorp, p_office: currentOffice || null,
       p_year: year, p_end_month: month, p_period_type: periodTypeForRpc()
     }).then(function (res) {
       if (res.error) throw res.error;
@@ -312,7 +334,7 @@
     if (!client) { showToast(t("fetchFail")); return; }
     var range = periodRange();
     client.rpc("get_ga_breakdown", {
-      p_access_key: ctx.accessKey, p_corp: INSIGHTS_CORP, p_office: currentOffice || null,
+      p_access_key: ctx.accessKey, p_corp: currentCorp, p_office: currentOffice || null,
       p_start_ym: range.start, p_end_ym: range.end
     }).then(function (res) {
       if (res.error) throw res.error;
@@ -391,7 +413,7 @@
     var client = window.getSupabaseClient();
     if (!client) { showToast(t("fetchFail")); return; }
     client.rpc("get_stability_series", {
-      p_access_key: ctx.accessKey, p_corp: INSIGHTS_CORP, p_yearmonth: ctx.yearmonth,
+      p_access_key: ctx.accessKey, p_corp: currentCorp, p_yearmonth: ctx.yearmonth,
       p_months_back: 12, p_office: currentOffice || null
     }).then(function (res) {
       if (res.error) throw res.error;
@@ -411,6 +433,18 @@
       loadWaterfall();
       loadGaBreakdown();
       renderStability(); // 저량지표라 재조회 없이 기간 재집계만 하면 됩니다.
+    });
+  }
+
+  function bindCorpSelect() {
+    document.getElementById("corpSelect").addEventListener("change", function (e) {
+      currentCorp = e.target.value;
+      // 법인이 바뀌면 이전 법인의 지점이 그대로 남으면 안 되므로 "전체"로 되돌립니다.
+      currentOffice = "";
+      renderOfficeSelect();
+      loadWaterfall();
+      loadGaBreakdown();
+      loadStability();
     });
   }
 
@@ -518,6 +552,7 @@
     }
 
     bindPeriodToggle();
+    bindCorpSelect();
     bindOfficeSelect();
     bindExportButtons();
     window.addEventListener("resize", resizeCharts);

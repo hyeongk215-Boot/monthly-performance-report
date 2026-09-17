@@ -583,10 +583,10 @@ grant execute on function get_performance_aggregate(text, text) to anon, authent
 -- 직접 조회하는 별도 함수를 둡니다. p_office가 비어있으면 법인 전체 합산, office_scope가
 -- 있으면 강제.
 --
--- ⚠ 열람 제한 2가지 (화면단 차단과 별개로 서버에서도 강제합니다):
---   1) 역할: 관리자(system_admin)와 본사 회계(finance)만 열람. 지점 접근키(branch_*)는 차단.
---   2) 법인: YJC 포워딩 고정. 관리자라도 다른 법인은 조회할 수 없으므로 p_corp는 무시합니다.
---      (파라미터는 호출부 호환을 위해 시그니처에 그대로 남겨둡니다.)
+-- ⚠ 열람 제한 (화면단 차단과 별개로 서버에서도 강제합니다):
+--   역할: 관리자(system_admin)와 본사 회계(finance)만 열람. 지점 접근키(branch_*)는 차단.
+--   법인은 6개 모두 조회할 수 있습니다. 본사 전용 화면이라 법인을 묶을 이유가 없고, 지점이
+--   남의 법인을 보는 경로는 위 역할 검사에서 이미 막힙니다.
 create or replace function get_ga_breakdown(
   p_access_key text,
   p_corp text,
@@ -613,7 +613,7 @@ begin
     raise exception 'forbidden_role';
   end if;
 
-  v_corp := 'YJC 포워딩';
+  v_corp := coalesce(v_branch_scope, p_corp);
   v_office := coalesce(v_office_scope, p_office);
 
   select jsonb_agg(to_jsonb(x) order by x.category) into v_result

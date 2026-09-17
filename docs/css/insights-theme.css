@@ -40,12 +40,11 @@
 .ins-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
 .ins-table tbody tr:hover td { background: var(--surface-2); }
 
-/* 법인 고정 표시용 읽기전용 입력칸.
-   ⚠ style.css의 input[type=text] 규칙(specificity 0,1,1)을 이기려면 요소선택자를 붙여야 합니다. */
-input.ins-locked-field {
+/* 접근키에 법인이 묶여 있어 선택을 바꿀 수 없을 때 회색 처리.
+   ⚠ style.css의 select 규칙(specificity 0,0,1)보다 높아야 하므로 id 선택자를 씁니다. */
+#corpSelect:disabled, #officeSelect:disabled {
   background: var(--surface-2); color: var(--muted); cursor: not-allowed;
 }
-input.ins-locked-field:focus { border-color: var(--border); box-shadow: none; }
 
 @media (max-width: 900px) {
   .ins-stat-grid, .ins-chart-grid { grid-template-columns: 1fr; }
