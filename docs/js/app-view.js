@@ -178,6 +178,7 @@
       "<td>" + fmt(row.gaExpenseCny) + "</td>" +
       "<td>" + fmt(row.entertainmentCny) + "</td>" +
       "<td>" + fmt(row.travelCny) + "</td>" +
+      "<td>" + fmt(actual) + "</td>" +
       "<td>" + fmt(row.netProfitCny) + "</td>";
     return tr;
   }
@@ -205,7 +206,7 @@
     var periods = (data && data.periods) || [];
     if (!periods.length) {
       var tr = document.createElement("tr");
-      tr.innerHTML = "<td colspan='14' style='color:var(--muted);'>" + t("noData") + "</td>";
+      tr.innerHTML = "<td colspan='15' style='color:var(--muted);'>" + t("noData") + "</td>";
       body.appendChild(tr);
       return;
     }

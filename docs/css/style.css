@@ -276,3 +276,14 @@ tr.row-subtotal td { background: var(--surface-2); font-weight: 700; }
 .variance-badge.over { background: var(--danger-bg); color: var(--danger); }
 .variance-badge.under { background: var(--ok-bg); color: var(--ok); }
 .variance-badge.na { background: var(--surface-2); color: var(--muted); }
+
+/* 목표실적 관리표: 목표/달성 블록과 실적 블록 사이의 구분용 빈 행.
+   엑셀 출력에서만 "별도 표"처럼 보이면 되므로 화면에서는 숨깁니다
+   (엑셀에는 app-admin.js의 XLS_STYLE만 실려서 이 규칙이 적용되지 않습니다). */
+tr.row-spacer { display: none; }
+
+/* 표 오른쪽 위 통화 단위 표기 */
+.unit-note {
+  text-align: right; font-size: 12px; font-weight: 600;
+  color: var(--muted); margin: 0 0 6px;
+}

@@ -9,12 +9,18 @@
     { key: "achievementPct", label: "colAchievementRate", pct: true, rowClass: "row-rate" },
     { key: "headcount", label: "colHeadcount", intVal: true },
     { key: "productivity", label: "colProductivity", rowClass: "row-rate" },
+    // 위쪽 목표/달성 블록과 아래쪽 실적 블록을 첨부 양식처럼 떼어놓기 위한 빈 줄입니다.
+    // 화면에서는 style.css의 .row-spacer가 숨기고, 엑셀 출력에는 빈 행으로 들어갑니다.
+    { spacer: true },
     { key: "revenueCny", label: "colRevenue" },
     { key: "costOfSalesCny", label: "colCostOfSalesCny" },
     { key: "salesProfitCny", label: "colSalesProfitCny", rowClass: "row-subtotal" },
     { key: "gaExpenseCny", label: "colGaExpenseCny" },
     { key: "entertainmentCny", label: "colEntertainmentCny" },
     { key: "travelCny", label: "colTravelCny" },
+    // 출장비 다음에 한국식 영업이익을 한 번 더 둡니다(첨부 양식과 동일). 상단 두 번째 줄의
+    // 같은 값이지만, 실적 블록 안에서 매출→…→출장비→영업이익→당기순이익 흐름이 끊기지 않게 합니다.
+    { key: "operatingProfitCny", label: "colOperatingProfitKr", rowClass: "row-subtotal" },
     { key: "netProfitCny", label: "colNetProfit", rowClass: "row-subtotal" }
   ];
 
@@ -133,6 +139,13 @@
     thead.appendChild(buildPivotHead(columns));
     METRIC_ROWS.forEach(function (row) {
       var tr = document.createElement("tr");
+      if (row.spacer) {
+        // colspan으로 묶으면 엑셀에서 셀이 병합되어 열 너비가 틀어지므로 빈 셀을 하나씩 넣습니다.
+        tr.className = "row-spacer";
+        tr.innerHTML = new Array(columns.length + 2).join("<td>&nbsp;</td>");
+        tbody.appendChild(tr);
+        return;
+      }
       if (row.rowClass) tr.className = row.rowClass;
       var cells = columns.map(function (c) {
         if (block === "diff") {
@@ -166,7 +179,7 @@
     body.innerHTML = "";
     var periods = (data && data.periods) || [];
     if (!periods.length) {
-      body.innerHTML = "<tr><td colspan='14' style='color:var(--muted);'>" + t("noData") + "</td></tr>";
+      body.innerHTML = "<tr><td colspan='15' style='color:var(--muted);'>" + t("noData") + "</td></tr>";
       return;
     }
     periods.forEach(function (row, i) {
@@ -192,6 +205,7 @@
         "<td>" + fmt(row.gaExpenseCny) + "</td>" +
         "<td>" + fmt(row.entertainmentCny) + "</td>" +
         "<td>" + fmt(row.travelCny) + "</td>" +
+        "<td>" + fmt(actual) + "</td>" +
         "<td>" + fmt(row.netProfitCny) + "</td>";
       body.appendChild(tr);
     });
@@ -238,7 +252,14 @@
     ".row-rate td{background:#FFFFCC;} " +
     ".row-subtotal td{background:#F0F0F0;font-weight:bold;} " +
     ".subtotal-row td{background:#F0F0F0;font-weight:bold;} " +
+    ".row-spacer td{border:none;background:#FFFFFF;} " +
+    ".unit{text-align:right;font-weight:bold;} " +
     "td:first-child,th:first-child{text-align:left;}";
+
+  // 표 오른쪽 위 "단위 : LOCAL CURRENCY" 표기. 홍콩 컬럼만 HKD라서 계정명에 (CNY)를 붙이지 않습니다.
+  function unitLine() {
+    return "<p class='unit'>" + t("unitLocalCurrency") + "</p>";
+  }
 
   function downloadHtmlAsXls(filename, bodyHtml) {
     var html = "<html><head><meta charset='UTF-8'><style>" + XLS_STYLE + "</style></head><body>" + bodyHtml + "</body></html>";
@@ -254,13 +275,14 @@
     var mode = document.getElementById("reportMode").value;
     if (mode === "all") {
       if (!lastGroupData || !(lastGroupData.columns || []).length) { showToast(t("adminDeleteSelectedNone")); return; }
-      var html = "<p class='ttl'>" + t("reportCurrentSheetName") + "</p>" + document.getElementById("reportCurrentTable").outerHTML +
+      var html = unitLine() +
+        "<p class='ttl'>" + t("reportCurrentSheetName") + "</p>" + document.getElementById("reportCurrentTable").outerHTML +
         "<p class='ttl'>" + t("reportPrevSheetName") + "</p>" + document.getElementById("reportPrevTable").outerHTML +
         "<p class='ttl'>" + t("reportYoySheetName") + "</p>" + document.getElementById("reportYoyTable").outerHTML;
       downloadHtmlAsXls(t("fileNamePrefix") + "_목표실적_" + document.getElementById("reportYear").value + ".xls", html);
     } else {
       if (!lastSeriesData || !(lastSeriesData.periods || []).length) { showToast(t("adminDeleteSelectedNone")); return; }
-      var html2 = "<p class='ttl'>" + t("targetPerfAdminHeading") + "</p>" + document.getElementById("officeSeriesTable").outerHTML;
+      var html2 = unitLine() + "<p class='ttl'>" + t("targetPerfAdminHeading") + "</p>" + document.getElementById("officeSeriesTable").outerHTML;
       downloadHtmlAsXls(t("fileNamePrefix") + "_목표실적_" + document.getElementById("reportYear").value + ".xls", html2);
     }
   }

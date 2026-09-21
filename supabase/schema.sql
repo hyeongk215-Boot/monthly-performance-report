@@ -277,11 +277,21 @@ end;
 $$;
 
 -- 내부 헬퍼(그랜트 없음, RPC로 직접 호출 불가): 지정된 법인/지점/기간(YYYY-MM~YYYY-MM)의
+-- YJC 포워딩 목표실적 관리표의 중국 대륙 지점 고정 순서입니다.
+-- 이 순서는 본사 제출 양식과 동일해야 하므로 데이터 유무와 무관하게 항상 이 순서로 컬럼을 냅니다.
+-- 홍콩은 통화가 달라(HKD) 소계에 합산하면 안 되므로 여기에 넣지 않고 소계 뒤에 별도 컬럼으로 붙입니다.
+create or replace function perf_yjc_offices() returns text[]
+language sql immutable
+as $$
+  select array['상해', '닝보', '남경', '천진', '대련', '청도', '위해', '연태', '심천', '광주', '충칭'];
+$$;
+
 -- 목표실적 관리표 한 구간(월/분기/반기/연간 버킷 1개) 데이터를 계산합니다.
--- p_office가 null/빈 문자열이면 그 법인의 전 지점 합산.
-create or replace function perf_target_bucket(
+-- p_offices가 null이면 그 법인의 전 지점 합산, 배열이면 그 지점들만 합산합니다.
+-- (지점 여러 개를 골라 합산해야 하는 이유: YJC 소계는 홍콩을 제외한 대륙 11개 지점만 더해야 합니다.)
+create or replace function perf_target_bucket_offices(
   p_corp text,
-  p_office text,
+  p_offices text[],
   p_start_ym text,
   p_end_ym text
 ) returns jsonb
@@ -301,25 +311,25 @@ declare
   v_travel numeric;
 begin
   select coalesce(sum(target_operating_profit_cny), 0) into v_target from bgt_target_profit
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym;
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym;
   select coalesce(sum(amount_cny), 0) into v_revenue from acct_statement_lines
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '500000';
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '500000';
   select coalesce(sum(amount_cny), 0) into v_cost from acct_statement_lines
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '600000';
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '600000';
   select coalesce(sum(amount_cny), 0) into v_sales_profit from acct_statement_lines
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '699999';
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '699999';
   select coalesce(sum(amount_cny), 0) into v_ga from acct_statement_lines
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '700000';
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '700000';
   select coalesce(sum(amount_cny), 0) into v_op from acct_statement_lines
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '799999';
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '799999';
   select coalesce(sum(amount_cny), 0) into v_net from acct_statement_lines
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '999999';
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym and statement_type = 'PL_KR' and account_code = '999999';
   select round(avg(headcount)) into v_headcount from acct_pl_kr_extra
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym and headcount is not null;
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym and headcount is not null;
   select coalesce(sum(entertainment_cny), 0) into v_entertainment from acct_pl_kr_extra
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym;
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym;
   select coalesce(sum(travel_cny), 0) into v_travel from acct_pl_kr_extra
-    where corp = p_corp and (nullif(p_office, '') is null or office = p_office) and yearmonth between p_start_ym and p_end_ym;
+    where corp = p_corp and (p_offices is null or office = any(p_offices)) and yearmonth between p_start_ym and p_end_ym;
 
   return jsonb_build_object(
     'targetOperatingProfitCny', v_target,
@@ -337,6 +347,25 @@ begin
     'travelCny', v_travel
   );
 end;
+$$;
+
+-- 지점 1개(또는 법인 전체) 버전. 기존 호출부가 그대로 쓰도록 시그니처를 유지한 얇은 래퍼입니다.
+-- p_office가 null/빈 문자열이면 그 법인의 전 지점 합산.
+create or replace function perf_target_bucket(
+  p_corp text,
+  p_office text,
+  p_start_ym text,
+  p_end_ym text
+) returns jsonb
+language sql
+stable
+as $$
+  select perf_target_bucket_offices(
+    p_corp,
+    case when nullif(p_office, '') is null then null else array[p_office] end,
+    p_start_ym,
+    p_end_ym
+  );
 $$;
 
 -- 목표실적 관리표 (단일 지점, 기간 시계열). 지점 화면: 접속 지점의 1~선택월까지 월별 컬럼(월 선택시),
@@ -435,6 +464,9 @@ declare
   v_cols jsonb := '[]'::jsonb;
   v_columns jsonb := '[]'::jsonb;
   v_corp text;
+  v_fixed text[];
+  v_subtotal text[];
+  v_office text;
   rec record;
 begin
   select role into v_role from verify_access_key(p_access_key);
@@ -459,6 +491,17 @@ begin
   v_prior_end := (left(v_end_ym, 4)::int - 1)::text || right(v_end_ym, 3);
 
   if p_group = 'yjc' then
+    -- 대륙 11개 지점은 본사 양식과 같은 순서로 고정합니다. 해당 기간에 데이터가 없어도 컬럼은
+    -- 그대로 내보내서 달마다 컬럼 순서가 달라지지 않게 합니다.
+    v_fixed := perf_yjc_offices();
+    v_subtotal := v_fixed;
+    foreach v_office in array v_fixed
+    loop
+      v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', v_office, 'corp', 'YJC 포워딩', 'offices', to_jsonb(array[v_office])));
+    end loop;
+
+    -- 고정 목록에도 홍콩에도 없는 지점이 실제 데이터에 있으면 소계에서 조용히 누락되지 않도록
+    -- 고정 컬럼 뒤에 이어 붙이고 소계 대상에도 포함시킵니다.
     for rec in
       select distinct office from (
         select office from acct_statement_lines where corp = 'YJC 포워딩' and statement_type = 'PL_KR' and yearmonth between v_start_ym and v_end_ym
@@ -466,11 +509,17 @@ begin
         select office from acct_pl_kr_extra where corp = 'YJC 포워딩' and yearmonth between v_start_ym and v_end_ym
         union
         select office from bgt_target_profit where corp = 'YJC 포워딩' and yearmonth between v_start_ym and v_end_ym
-      ) s where office is not null and office <> '' order by office
+      ) s
+      where office is not null and office <> '' and office <> '홍콩' and not (office = any(v_fixed))
+      order by office
     loop
-      v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', rec.office, 'corp', 'YJC 포워딩', 'office', rec.office));
+      v_subtotal := v_subtotal || rec.office;
+      v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', rec.office, 'corp', 'YJC 포워딩', 'offices', to_jsonb(array[rec.office])));
     end loop;
-    v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', '합계', 'corp', 'YJC 포워딩', 'office', null));
+
+    -- 소계는 대륙 지점만 더합니다. 홍콩은 HKD라 합산하면 통화가 섞이므로 소계 뒤 별도 컬럼입니다.
+    v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', '합계', 'corp', 'YJC 포워딩', 'offices', to_jsonb(v_subtotal)));
+    v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', '홍콩', 'corp', 'YJC 포워딩', 'offices', to_jsonb(array['홍콩'::text])));
   else
     for rec in
       select distinct office from (
@@ -481,21 +530,21 @@ begin
         select office from bgt_target_profit where corp = '흥아물류' and yearmonth between v_start_ym and v_end_ym
       ) s where office is not null and office <> '' order by office
     loop
-      v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', rec.office, 'corp', '흥아물류', 'office', rec.office));
+      v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', rec.office, 'corp', '흥아물류', 'offices', to_jsonb(array[rec.office])));
     end loop;
-    v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', '흥아물류 합계', 'corp', '흥아물류', 'office', null));
+    v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', '흥아물류 합계', 'corp', '흥아물류', 'offices', null));
     foreach v_corp in array array['상해물류센터', '윤봉물류', '창씽 CY', '청도 CY']
     loop
-      v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', v_corp, 'corp', v_corp, 'office', null));
+      v_cols := v_cols || jsonb_build_array(jsonb_build_object('label', v_corp, 'corp', v_corp, 'offices', null));
     end loop;
   end if;
 
-  for rec in select * from jsonb_to_recordset(v_cols) as x(label text, corp text, office text)
+  for rec in select * from jsonb_to_recordset(v_cols) as x(label text, corp text, offices text[])
   loop
     v_columns := v_columns || jsonb_build_array(jsonb_build_object(
       'label', rec.label,
-      'current', perf_target_bucket(rec.corp, rec.office, v_start_ym, v_end_ym),
-      'prior', perf_target_bucket(rec.corp, rec.office, v_prior_start, v_prior_end)
+      'current', perf_target_bucket_offices(rec.corp, rec.offices, v_start_ym, v_end_ym),
+      'prior', perf_target_bucket_offices(rec.corp, rec.offices, v_prior_start, v_prior_end)
     ));
   end loop;
 
@@ -568,6 +617,9 @@ end;
 $$;
 
 grant execute on function perf_all_corps() to anon, authenticated;
+grant execute on function perf_yjc_offices() to anon, authenticated;
+grant execute on function perf_target_bucket_offices(text, text[], text, text) to anon, authenticated;
+grant execute on function perf_target_bucket(text, text, text, text) to anon, authenticated;
 grant execute on function get_profitability_series(text, text, text, integer, text) to anon, authenticated;
 grant execute on function get_stability_series(text, text, text, integer, text) to anon, authenticated;
 grant execute on function get_budget_variance_summary(text, text, text, text) to anon, authenticated;
