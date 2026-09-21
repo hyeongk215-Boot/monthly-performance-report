@@ -21,6 +21,7 @@
 
   function fmt(n) { return window.fmtMoney(n); }
   function fmtPct(n) { return window.fmtPercent(n); }
+  function fmtCnt(n) { return window.fmtCount(n); }
 
   function renderContextBar() {
     var el = document.getElementById("contextBar");
@@ -166,7 +167,7 @@
       "<td>" + fmt(actual) + "</td>" +
       "<td>" + fmt(over) + "</td>" +
       "<td class='pct'>" + fmtPct(achievePct) + "</td>" +
-      "<td>" + fmt(headcount) + "</td>" +
+      "<td class='cnt'>" + fmtCnt(headcount) + "</td>" +
       "<td>" + fmt(productivity) + "</td>" +
       "<td>" + fmt(row.revenueCny) + "</td>" +
       "<td>" + fmt(row.costOfSalesCny) + "</td>" +

@@ -112,14 +112,14 @@
         row.debtRatioPct, row.currentRatioPct, row.roePct, row.roiPct, row.equityRatioPct, row.achievementPct, row.cashChangePct, row.loanBalanceCny]);
     });
     // 셀 값은 숫자 그대로 두고 표시 서식만 지정합니다(받는 쪽에서 합계·수식을 쓸 수 있게).
-    // 금액은 #,##0_);[빨강](#,##0), 비율은 소수점 2자리.
+    // 금액은 #,##0.00_);[빨강](#,##0.00), 비율은 소수점 2자리.
     var ws = XLSX.utils.aoa_to_sheet(aoa);
     var MONEY_COLS = [2, 12], PCT_COLS = [3, 4, 5, 6, 7, 8, 9, 10, 11];
     for (var r = 1; r < aoa.length; r++) {
       MONEY_COLS.concat(PCT_COLS).forEach(function (c) {
         var cell = ws[XLSX.utils.encode_cell({ c: c, r: r })];
         if (!cell || cell.t !== "n") return;
-        cell.z = MONEY_COLS.indexOf(c) !== -1 ? '#,##0_);[Red](#,##0)' : '0.00"%"';
+        cell.z = MONEY_COLS.indexOf(c) !== -1 ? '#,##0.00_);[Red](#,##0.00)' : '0.00"%"';
       });
     }
     var wb = XLSX.utils.book_new();

@@ -7,7 +7,8 @@
     { key: "operatingProfitCny", label: "colOperatingProfitKr" },
     { key: "overachievedCny", label: "colOverAchievedCny" },
     { key: "achievementPct", label: "colAchievementRate", pct: true, rowClass: "row-rate" },
-    { key: "headcount", label: "colHeadcount" },
+    // 인원수는 금액이 아니라서 소수점 2자리 서식을 쓰지 않습니다("4.00명"이 되어버립니다).
+    { key: "headcount", label: "colHeadcount", count: true },
     { key: "productivity", label: "colProductivity", rowClass: "row-rate" },
     // 위쪽 목표/달성 블록과 아래쪽 실적 블록을 첨부 양식처럼 떼어놓기 위한 빈 줄입니다.
     // 화면에서는 style.css의 .row-spacer가 숨기고, 엑셀 출력에는 빈 행으로 들어갑니다.
@@ -33,6 +34,7 @@
 
   function fmt(n) { return window.fmtMoney(n); }
   function fmtPct(n) { return window.fmtPercent(n); }
+  function fmtCnt(n) { return window.fmtCount(n); }
   function metricValue(row, bucket) {
     var v = bucket ? bucket[row.key] : null;
     if (v === null || v === undefined) return null;
@@ -41,7 +43,7 @@
   function metricText(row, bucket) {
     var v = metricValue(row, bucket);
     if (v === null) return t("noData");
-    return row.pct ? fmtPct(v) : fmt(v);
+    return row.pct ? fmtPct(v) : (row.count ? fmtCnt(v) : fmt(v));
   }
 
   function getKey() { return document.getElementById("adminKey").value; }
@@ -144,15 +146,17 @@
       }
       // 비율 행은 가운데 정렬(.pct-row), 나머지 금액 행은 오른쪽 정렬이 기본입니다.
       tr.className = (row.rowClass || "") + (row.pct ? " pct-row" : "");
+      // 인원수 행은 엑셀에서 정수 서식(.cnt)이어야 합니다 — 금액 서식이면 "4.00"이 됩니다.
+      var cellClass = row.count ? " class='cnt'" : "";
       var cells = columns.map(function (c) {
         if (block === "diff") {
           var cur = metricValue(row, c.current);
           var prev = metricValue(row, c.prior);
-          if (cur === null && prev === null) return "<td>" + t("noData") + "</td>";
+          if (cur === null && prev === null) return "<td" + cellClass + ">" + t("noData") + "</td>";
           var diff = (cur || 0) - (prev || 0);
-          return "<td>" + (row.pct ? fmtPct(diff) : fmt(diff)) + "</td>";
+          return "<td" + cellClass + ">" + (row.pct ? fmtPct(diff) : (row.count ? fmtCnt(diff) : fmt(diff))) + "</td>";
         }
-        return "<td>" + metricText(row, c[block]) + "</td>";
+        return "<td" + cellClass + ">" + metricText(row, c[block]) + "</td>";
       }).join("");
       tr.innerHTML = "<td style='text-align:left;'>" + t(row.label) + "</td>" + cells;
       tbody.appendChild(tr);
@@ -194,7 +198,7 @@
         "<td>" + fmt(actual) + "</td>" +
         "<td>" + fmt(over) + "</td>" +
         "<td class='pct'>" + fmtPct(achievePct) + "</td>" +
-        "<td>" + fmt(headcount) + "</td>" +
+        "<td class='cnt'>" + fmtCnt(headcount) + "</td>" +
         "<td>" + fmt(productivity) + "</td>" +
         "<td>" + fmt(row.revenueCny) + "</td>" +
         "<td>" + fmt(row.costOfSalesCny) + "</td>" +
@@ -251,9 +255,11 @@
     ".subtotal-row td{background:#F0F0F0;font-weight:bold;} " +
     ".row-spacer td{border:none;background:#FFFFFF;} " +
     ".unit{text-align:right;font-weight:bold;} " +
-    // 금액 셀 서식: #,##0_);[빨강](#,##0). CSS 문자열 안이라 특수문자를 역슬래시로 escape
+    // 금액 셀 서식: #,##0.00_);[빨강](#,##0.00). CSS 문자열 안이라 특수문자를 역슬래시로 escape
     // 해야 엑셀이 서식 코드 전체를 읽습니다(특히 세미콜론 - 안 막으면 CSS 선언이 거기서 끊깁니다).
-    '.num{mso-number-format:"\\#\\,\\#\\#0_\\)\\;[Red]\\\\(\\#\\,\\#\\#0\\\\)";} ' +
+    '.num{mso-number-format:"\\#\\,\\#\\#0.00_\\)\\;[Red]\\\\(\\#\\,\\#\\#0.00\\\\)";} ' +
+    // 인원수 셀은 금액이 아니라 소수점 없는 #,##0.
+    '.cnt{mso-number-format:"\\#\\,\\#\\#0_\\)\\;[Red]\\\\(\\#\\,\\#\\#0\\\\)";} ' +
     // 비율 셀은 가운데. 열 단위는 td.pct, 행 단위(전체 모드 달성률)는 tr.pct-row.
     ".pct,.pct-row td{text-align:center;} " +
     ".neg{color:#FF0000;} " +
@@ -279,7 +285,9 @@
       for (var j = 1; j < cells.length; j++) { // 0번은 항목명/기간 열이라 건너뜁니다.
         var raw = toRawNumber(cells[j].textContent);
         if (raw === null) continue;
-        cells[j].className = (cells[j].className ? cells[j].className + " " : "") + "num";
+        // 인원수 칸(.cnt)은 이미 정수 서식이 붙어 있으므로 금액 서식(.num)을 덧씌우지 않습니다.
+        var isCount = / cnt |^cnt | cnt$|^cnt$/.test(cells[j].className);
+        if (!isCount) cells[j].className = (cells[j].className ? cells[j].className + " " : "") + "num";
         cells[j].textContent = raw;
       }
     }

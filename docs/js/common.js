@@ -59,8 +59,9 @@ window.officeLabel = function (koValue, lang) {
 };
 
 // ===== 숫자 표기 (본사 제출 양식 기준) =====
-// 금액·수량: 소수점 없이 #,##0, 음수는 빨강 괄호 "(1,234)", 셀은 오른쪽 정렬.
-// 비율(%)  : 소수점 2자리, 음수는 빨강, 셀은 가운데 정렬.
+// 금액    : 소수점 2자리 #,##0.00, 음수는 빨강 괄호 "(1,234.00)", 셀은 오른쪽 정렬.
+// 비율(%) : 소수점 2자리, 음수는 빨강, 셀은 가운데 정렬.
+// 인원수  : 금액이 아니므로 소수점 없이 정수(fmtCount).
 // 반환값에 <span class="neg">가 섞일 수 있으므로 innerHTML로 넣어야 합니다
 // (textContent로 넣으면 태그가 글자 그대로 보입니다).
 // 엑셀 출력은 app-admin.js가 셀 값을 원시 숫자로 되돌리고 같은 서식을
@@ -68,9 +69,9 @@ window.officeLabel = function (koValue, lang) {
 window.fmtMoney = function (n) {
   var num = Number(n);
   if (n === null || n === undefined || n === "" || isNaN(num)) return t("noData");
-  var rounded = Math.round(num);
-  var text = Math.abs(rounded).toLocaleString("en-US");
-  return rounded < 0 ? '<span class="neg">(' + text + ')</span>' : text;
+  var text = Math.abs(num).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // 반올림해서 0.00이 되는 음수는 괄호를 씌우지 않습니다("(0.00)"은 손실처럼 보입니다).
+  return num < 0 && Number(text.replace(/,/g, "")) > 0 ? '<span class="neg">(' + text + ')</span>' : text;
 };
 window.fmtPercent = function (n) {
   var num = Number(n);
@@ -78,11 +79,19 @@ window.fmtPercent = function (n) {
   var text = Math.abs(num).toFixed(2) + "%";
   return Number(text.slice(0, -1)) > 0 && num < 0 ? '<span class="neg">-' + text + "</span>" : text;
 };
+// 인원수처럼 소수점이 의미 없는 값. 금액 서식(2자리)을 쓰면 "4.00명"처럼 보입니다.
+window.fmtCount = function (n) {
+  var num = Number(n);
+  if (n === null || n === undefined || n === "" || isNaN(num)) return t("noData");
+  var rounded = Math.round(num);
+  var text = Math.abs(rounded).toLocaleString("en-US");
+  return rounded < 0 ? '<span class="neg">(' + text + ')</span>' : text;
+};
 // 차트 라벨/툴팁용. ECharts·Chart.js는 HTML 태그를 해석하지 않으므로 태그 없는 값을 씁니다.
 window.fmtMoneyPlain = function (n) {
   var num = Number(n);
   if (n === null || n === undefined || n === "" || isNaN(num)) return t("noData");
-  return Math.round(num).toLocaleString("en-US");
+  return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 // ===== 세션 컨텍스트 =====
