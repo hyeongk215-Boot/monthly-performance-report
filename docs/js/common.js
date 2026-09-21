@@ -40,15 +40,49 @@ function findByKo(list, koValue) {
   }
   return null;
 }
+// ko값은 DB에 그대로 저장되는 키라서 바꿀 수 없습니다. 화면 표기만 다르게 하고 싶으면
+// config.js 항목에 koLabel을 넣습니다 (예: DB는 "충칭", 본사 양식 표기는 "중경").
+function pickLabel(item, lang) {
+  lang = lang || getLang();
+  if (lang === "ko" && item.koLabel) return item.koLabel;
+  return item[lang] || item.koLabel || item.ko;
+}
 window.corpLabel = function (koValue, lang) {
   var item = findByKo(window.APP_CONFIG.CORPORATIONS, koValue);
   if (!item) return koValue;
-  return item[lang || getLang()] || item.ko;
+  return pickLabel(item, lang);
 };
 window.officeLabel = function (koValue, lang) {
   var item = findByKo(window.APP_CONFIG.OFFICES, koValue);
   if (!item) return koValue;
-  return item[lang || getLang()] || item.ko;
+  return pickLabel(item, lang);
+};
+
+// ===== 숫자 표기 (본사 제출 양식 기준) =====
+// 금액·수량: 소수점 없이 #,##0, 음수는 빨강 괄호 "(1,234)", 셀은 오른쪽 정렬.
+// 비율(%)  : 소수점 2자리, 음수는 빨강, 셀은 가운데 정렬.
+// 반환값에 <span class="neg">가 섞일 수 있으므로 innerHTML로 넣어야 합니다
+// (textContent로 넣으면 태그가 글자 그대로 보입니다).
+// 엑셀 출력은 app-admin.js가 셀 값을 원시 숫자로 되돌리고 같은 서식을
+// mso-number-format으로 입히므로, 받는 쪽에서 합계·수식을 그대로 쓸 수 있습니다.
+window.fmtMoney = function (n) {
+  var num = Number(n);
+  if (n === null || n === undefined || n === "" || isNaN(num)) return t("noData");
+  var rounded = Math.round(num);
+  var text = Math.abs(rounded).toLocaleString("en-US");
+  return rounded < 0 ? '<span class="neg">(' + text + ')</span>' : text;
+};
+window.fmtPercent = function (n) {
+  var num = Number(n);
+  if (n === null || n === undefined || n === "" || isNaN(num)) return t("noData");
+  var text = Math.abs(num).toFixed(2) + "%";
+  return Number(text.slice(0, -1)) > 0 && num < 0 ? '<span class="neg">-' + text + "</span>" : text;
+};
+// 차트 라벨/툴팁용. ECharts·Chart.js는 HTML 태그를 해석하지 않으므로 태그 없는 값을 씁니다.
+window.fmtMoneyPlain = function (n) {
+  var num = Number(n);
+  if (n === null || n === undefined || n === "" || isNaN(num)) return t("noData");
+  return Math.round(num).toLocaleString("en-US");
 };
 
 // ===== 세션 컨텍스트 =====

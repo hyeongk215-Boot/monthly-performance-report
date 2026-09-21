@@ -7,7 +7,7 @@
     { key: "operatingProfitCny", label: "colOperatingProfitKr" },
     { key: "overachievedCny", label: "colOverAchievedCny" },
     { key: "achievementPct", label: "colAchievementRate", pct: true, rowClass: "row-rate" },
-    { key: "headcount", label: "colHeadcount", intVal: true },
+    { key: "headcount", label: "colHeadcount" },
     { key: "productivity", label: "colProductivity", rowClass: "row-rate" },
     // 위쪽 목표/달성 블록과 아래쪽 실적 블록을 첨부 양식처럼 떼어놓기 위한 빈 줄입니다.
     // 화면에서는 style.css의 .row-spacer가 숨기고, 엑셀 출력에는 빈 행으로 들어갑니다.
@@ -31,13 +31,8 @@
     setTimeout(function () { el.classList.remove("show"); }, 3000);
   }
 
-  function fmt(n) {
-    if (n === null || n === undefined) return t("noData");
-    return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
-  }
-  function fmtPct(n) {
-    return (n === null || n === undefined) ? t("noData") : Number(n).toFixed(1) + "%";
-  }
+  function fmt(n) { return window.fmtMoney(n); }
+  function fmtPct(n) { return window.fmtPercent(n); }
   function metricValue(row, bucket) {
     var v = bucket ? bucket[row.key] : null;
     if (v === null || v === undefined) return null;
@@ -46,9 +41,7 @@
   function metricText(row, bucket) {
     var v = metricValue(row, bucket);
     if (v === null) return t("noData");
-    if (row.pct) return fmtPct(v);
-    if (row.intVal) return String(v);
-    return fmt(v);
+    return row.pct ? fmtPct(v) : fmt(v);
   }
 
   function getKey() { return document.getElementById("adminKey").value; }
@@ -122,8 +115,11 @@
   // ===== 전체(합계) 모드: 법인그룹 × 기간 (오피스 컬럼) =====
   function buildPivotHead(columns) {
     var tr = document.createElement("tr");
+    // 컬럼 라벨은 SQL(perf_yjc_offices 등)이 보내는 DB 저장값입니다. 화면 표기가 다른
+    // 지점(충칭 → 중경)이 있으므로 officeLabel을 거칩니다. "합계"처럼 목록에 없는 값은
+    // officeLabel이 그대로 돌려줍니다.
     tr.innerHTML = "<th style='text-align:left;'>" + t("colMetric") + "</th>" +
-      columns.map(function (c) { return "<th>" + c.label + "</th>"; }).join("");
+      columns.map(function (c) { return "<th>" + window.officeLabel(c.label) + "</th>"; }).join("");
     return tr;
   }
 
@@ -146,14 +142,15 @@
         tbody.appendChild(tr);
         return;
       }
-      if (row.rowClass) tr.className = row.rowClass;
+      // 비율 행은 가운데 정렬(.pct-row), 나머지 금액 행은 오른쪽 정렬이 기본입니다.
+      tr.className = (row.rowClass || "") + (row.pct ? " pct-row" : "");
       var cells = columns.map(function (c) {
         if (block === "diff") {
           var cur = metricValue(row, c.current);
           var prev = metricValue(row, c.prior);
           if (cur === null && prev === null) return "<td>" + t("noData") + "</td>";
           var diff = (cur || 0) - (prev || 0);
-          return "<td>" + (row.pct ? fmtPct(diff) : (row.intVal ? String(diff) : fmt(diff))) + "</td>";
+          return "<td>" + (row.pct ? fmtPct(diff) : fmt(diff)) + "</td>";
         }
         return "<td>" + metricText(row, c[block]) + "</td>";
       }).join("");
@@ -196,8 +193,8 @@
         "<td>" + fmt(target) + "</td>" +
         "<td>" + fmt(actual) + "</td>" +
         "<td>" + fmt(over) + "</td>" +
-        "<td>" + fmtPct(achievePct) + "</td>" +
-        "<td>" + (headcount != null ? headcount : t("noData")) + "</td>" +
+        "<td class='pct'>" + fmtPct(achievePct) + "</td>" +
+        "<td>" + fmt(headcount) + "</td>" +
         "<td>" + fmt(productivity) + "</td>" +
         "<td>" + fmt(row.revenueCny) + "</td>" +
         "<td>" + fmt(row.costOfSalesCny) + "</td>" +
@@ -254,7 +251,40 @@
     ".subtotal-row td{background:#F0F0F0;font-weight:bold;} " +
     ".row-spacer td{border:none;background:#FFFFFF;} " +
     ".unit{text-align:right;font-weight:bold;} " +
+    // 금액 셀 서식: #,##0_);[빨강](#,##0). CSS 문자열 안이라 특수문자를 역슬래시로 escape
+    // 해야 엑셀이 서식 코드 전체를 읽습니다(특히 세미콜론 - 안 막으면 CSS 선언이 거기서 끊깁니다).
+    '.num{mso-number-format:"\\#\\,\\#\\#0_\\)\\;[Red]\\\\(\\#\\,\\#\\#0\\\\)";} ' +
+    // 비율 셀은 가운데. 열 단위는 td.pct, 행 단위(전체 모드 달성률)는 tr.pct-row.
+    ".pct,.pct-row td{text-align:center;} " +
+    ".neg{color:#FF0000;} " +
     "td:first-child,th:first-child{text-align:left;}";
+
+  // 화면 표기("1,234", "(1,234)")를 엑셀이 숫자로 인식하는 원시 값으로 되돌립니다.
+  // 엑셀에는 원시 숫자를 넣고 위 .num 서식으로 같은 모양을 다시 입히므로, 받는 쪽에서
+  // 합계·수식을 그대로 쓸 수 있습니다. 퍼센트("12.34%")나 "-"(데이터 없음)는 null을
+  // 돌려줘서 글자 그대로 둡니다.
+  function toRawNumber(text) {
+    var s = String(text).replace(/,/g, "").replace(/[\s ]/g, "");
+    var negative = /^\(.*\)$/.test(s);
+    if (negative) s = s.slice(1, -1);
+    if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+    return (negative ? "-" : "") + s;
+  }
+
+  function tableForXls(tableId) {
+    var clone = document.getElementById(tableId).cloneNode(true);
+    var rows = clone.querySelectorAll("tr");
+    for (var i = 0; i < rows.length; i++) {
+      var cells = rows[i].querySelectorAll("td");
+      for (var j = 1; j < cells.length; j++) { // 0번은 항목명/기간 열이라 건너뜁니다.
+        var raw = toRawNumber(cells[j].textContent);
+        if (raw === null) continue;
+        cells[j].className = (cells[j].className ? cells[j].className + " " : "") + "num";
+        cells[j].textContent = raw;
+      }
+    }
+    return clone.outerHTML;
+  }
 
   // 표 오른쪽 위 "단위 : LOCAL CURRENCY" 표기. 홍콩 컬럼만 HKD라서 계정명에 (CNY)를 붙이지 않습니다.
   function unitLine() {
@@ -276,13 +306,13 @@
     if (mode === "all") {
       if (!lastGroupData || !(lastGroupData.columns || []).length) { showToast(t("adminDeleteSelectedNone")); return; }
       var html = unitLine() +
-        "<p class='ttl'>" + t("reportCurrentSheetName") + "</p>" + document.getElementById("reportCurrentTable").outerHTML +
-        "<p class='ttl'>" + t("reportPrevSheetName") + "</p>" + document.getElementById("reportPrevTable").outerHTML +
-        "<p class='ttl'>" + t("reportYoySheetName") + "</p>" + document.getElementById("reportYoyTable").outerHTML;
+        "<p class='ttl'>" + t("reportCurrentSheetName") + "</p>" + tableForXls("reportCurrentTable") +
+        "<p class='ttl'>" + t("reportPrevSheetName") + "</p>" + tableForXls("reportPrevTable") +
+        "<p class='ttl'>" + t("reportYoySheetName") + "</p>" + tableForXls("reportYoyTable");
       downloadHtmlAsXls(t("fileNamePrefix") + "_목표실적_" + document.getElementById("reportYear").value + ".xls", html);
     } else {
       if (!lastSeriesData || !(lastSeriesData.periods || []).length) { showToast(t("adminDeleteSelectedNone")); return; }
-      var html2 = unitLine() + "<p class='ttl'>" + t("targetPerfAdminHeading") + "</p>" + document.getElementById("officeSeriesTable").outerHTML;
+      var html2 = unitLine() + "<p class='ttl'>" + t("targetPerfAdminHeading") + "</p>" + tableForXls("officeSeriesTable");
       downloadHtmlAsXls(t("fileNamePrefix") + "_목표실적_" + document.getElementById("reportYear").value + ".xls", html2);
     }
   }

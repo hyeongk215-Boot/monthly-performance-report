@@ -282,6 +282,20 @@ tr.row-subtotal td { background: var(--surface-2); font-weight: 700; }
    (엑셀에는 app-admin.js의 XLS_STYLE만 실려서 이 규칙이 적용되지 않습니다). */
 tr.row-spacer { display: none; }
 
+/* ===== 숫자 셀 정렬/색상 (본사 제출 양식 기준) =====
+   table에 num-table을 붙인 표에만 적용합니다.
+   - 금액/수량: 오른쪽 맞춤. 첫 열(항목명·기간)만 왼쪽.
+   - 비율(%): 가운데 맞춤. 열 단위면 td.pct, 행 단위면 tr.pct-row.
+   - 음수: .neg (app-admin.js가 "(1,234)" 형태로 감싸서 내보냅니다).
+   엑셀 출력에는 이 파일이 실리지 않으므로 app-admin.js의 XLS_STYLE에 같은 규칙이 따로 있습니다. */
+table.num-table td { text-align: right; }
+table.num-table td:first-child,
+table.num-table td.txt { text-align: left; }
+table.num-table td.pct,
+table.num-table tr.pct-row td { text-align: center; }
+table.num-table tr.pct-row td:first-child { text-align: left; }
+.neg { color: var(--danger); }
+
 /* 표 오른쪽 위 통화 단위 표기 */
 .unit-note {
   text-align: right; font-size: 12px; font-weight: 600;

@@ -19,13 +19,8 @@
     setTimeout(function () { el.classList.remove("show"); }, 3000);
   }
 
-  function fmt(n) {
-    if (n === null || n === undefined) return t("noData");
-    return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
-  }
-  function fmtPct(n) {
-    return (n === null || n === undefined) ? t("noData") : Number(n).toFixed(1) + "%";
-  }
+  function fmt(n) { return window.fmtMoney(n); }
+  function fmtPct(n) { return window.fmtPercent(n); }
 
   function renderContextBar() {
     var el = document.getElementById("contextBar");
@@ -95,8 +90,8 @@
         "<td>" + fmt(row.revenueCny) + "</td>" +
         "<td>" + fmt(row.operatingProfitCny) + "</td>" +
         "<td>" + fmt(row.netProfitCny) + "</td>" +
-        "<td>" + fmtPct(opPct) + "</td>" +
-        "<td>" + fmtPct(netPct) + "</td>";
+        "<td class='pct'>" + fmtPct(opPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(netPct) + "</td>";
       body.appendChild(tr);
     });
 
@@ -121,15 +116,16 @@
   // "실적 지표" 카드의 매출이익률/영업이익률/당기순이익률: 선택된 적용년월(가장 최근 달) 기준.
   function renderMarginCards() {
     var last = rawProfitSeries.length ? rawProfitSeries[rawProfitSeries.length - 1] : null;
+    // fmt/fmtPct는 음수일 때 <span class="neg">를 붙여서 돌려주므로 innerHTML로 넣습니다.
     if (!last || !last.revenueCny) {
       document.getElementById("salesMarginPct").textContent = t("noData");
       document.getElementById("operatingMarginPct").textContent = t("noData");
       document.getElementById("netMarginPct").textContent = t("noData");
       return;
     }
-    document.getElementById("salesMarginPct").textContent = fmtPct(last.salesProfitCny / last.revenueCny * 100);
-    document.getElementById("operatingMarginPct").textContent = fmtPct(last.operatingProfitCny / last.revenueCny * 100);
-    document.getElementById("netMarginPct").textContent = fmtPct(last.netProfitCny / last.revenueCny * 100);
+    document.getElementById("salesMarginPct").innerHTML = fmtPct(last.salesProfitCny / last.revenueCny * 100);
+    document.getElementById("operatingMarginPct").innerHTML = fmtPct(last.operatingProfitCny / last.revenueCny * 100);
+    document.getElementById("netMarginPct").innerHTML = fmtPct(last.netProfitCny / last.revenueCny * 100);
   }
 
   function renderStability() {
@@ -140,19 +136,19 @@
       var tr = document.createElement("tr");
       tr.innerHTML =
         "<td>" + row.yearmonth + "</td>" +
-        "<td>" + fmtPct(row.debtRatioPct) + "</td>" +
-        "<td>" + fmtPct(row.currentRatioPct) + "</td>";
+        "<td class='pct'>" + fmtPct(row.debtRatioPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.currentRatioPct) + "</td>";
       body.appendChild(tr);
     });
   }
 
   function renderBudget(summary) {
-    document.getElementById("targetProfitCny").textContent = fmt(summary.targetProfitCny);
-    document.getElementById("actualProfitCny").textContent = fmt(summary.actualProfitCny);
-    document.getElementById("profitAchievementPct").textContent = fmtPct(summary.profitAchievementPct);
-    document.getElementById("gaBudgetCny").textContent = fmt(summary.gaBudgetCny);
-    document.getElementById("gaActualCny").textContent = fmt(summary.gaActualCny);
-    document.getElementById("gaAchievementPct").textContent = fmtPct(summary.gaAchievementPct);
+    document.getElementById("targetProfitCny").innerHTML = fmt(summary.targetProfitCny);
+    document.getElementById("actualProfitCny").innerHTML = fmt(summary.actualProfitCny);
+    document.getElementById("profitAchievementPct").innerHTML = fmtPct(summary.profitAchievementPct);
+    document.getElementById("gaBudgetCny").innerHTML = fmt(summary.gaBudgetCny);
+    document.getElementById("gaActualCny").innerHTML = fmt(summary.gaActualCny);
+    document.getElementById("gaAchievementPct").innerHTML = fmtPct(summary.gaAchievementPct);
   }
 
   function targetPerfRow(row, isTotal) {
@@ -169,8 +165,8 @@
       "<td>" + fmt(target) + "</td>" +
       "<td>" + fmt(actual) + "</td>" +
       "<td>" + fmt(over) + "</td>" +
-      "<td>" + fmtPct(achievePct) + "</td>" +
-      "<td>" + (headcount != null ? headcount : t("noData")) + "</td>" +
+      "<td class='pct'>" + fmtPct(achievePct) + "</td>" +
+      "<td>" + fmt(headcount) + "</td>" +
       "<td>" + fmt(productivity) + "</td>" +
       "<td>" + fmt(row.revenueCny) + "</td>" +
       "<td>" + fmt(row.costOfSalesCny) + "</td>" +
@@ -216,11 +212,11 @@
   }
 
   function renderFund(summary) {
-    document.getElementById("fundEndingCny").textContent = fmt(summary.endingCny);
-    document.getElementById("fundPrevEndingCny").textContent = fmt(summary.prevEndingCny);
-    document.getElementById("fundChangePct").textContent = fmtPct(summary.cashChangePct);
-    document.getElementById("fundLoanBalance").textContent = fmt(summary.totalLoanBalanceCny);
-    document.getElementById("fundDividend").textContent = fmt(summary.dividendAvailableCny);
+    document.getElementById("fundEndingCny").innerHTML = fmt(summary.endingCny);
+    document.getElementById("fundPrevEndingCny").innerHTML = fmt(summary.prevEndingCny);
+    document.getElementById("fundChangePct").innerHTML = fmtPct(summary.cashChangePct);
+    document.getElementById("fundLoanBalance").innerHTML = fmt(summary.totalLoanBalanceCny);
+    document.getElementById("fundDividend").innerHTML = fmt(summary.dividendAvailableCny);
   }
 
   function bindPeriodToggle() {

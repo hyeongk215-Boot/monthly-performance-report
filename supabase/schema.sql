@@ -280,6 +280,9 @@ $$;
 -- YJC 포워딩 목표실적 관리표의 중국 대륙 지점 고정 순서입니다.
 -- 이 순서는 본사 제출 양식과 동일해야 하므로 데이터 유무와 무관하게 항상 이 순서로 컬럼을 냅니다.
 -- 홍콩은 통화가 달라(HKD) 소계에 합산하면 안 되므로 여기에 넣지 않고 소계 뒤에 별도 컬럼으로 붙입니다.
+-- ⚠ 값은 acct_statement_lines.office에 실제로 저장된 문자열이어야 합니다. '충칭'을 본사 양식
+--   표기인 '중경'으로 바꾸면 이미 입력된 데이터와 매칭되지 않아 그 지점이 0원으로 나옵니다.
+--   화면 표기는 docs/js/config.js의 koLabel("중경")이 담당합니다.
 create or replace function perf_yjc_offices() returns text[]
 language sql immutable
 as $$

@@ -37,16 +37,13 @@
     setTimeout(function () { el.classList.remove("show"); }, 3000);
   }
 
-  function fmt(n) {
-    if (n === null || n === undefined) return t("noData");
-    return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
-  }
-  function fmtPct(n) {
-    return (n === null || n === undefined) ? t("noData") : Number(n).toFixed(1) + "%";
-  }
+  function fmt(n) { return window.fmtMoney(n); }
+  function fmtPct(n) { return window.fmtPercent(n); }
+  // ECharts는 HTML 태그를 해석하지 않으므로 차트 라벨/툴팁에는 태그 없는 값을 씁니다.
+  function fmtChart(n) { return window.fmtMoneyPlain(n); }
   function fmtWan(n) {
     if (n === null || n === undefined) return t("noData");
-    return (Number(n) / 10000).toLocaleString(undefined, { maximumFractionDigits: 1 }) + " 万元";
+    return (Number(n) / 10000).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " 万元";
   }
   function categoryLabel(cat) {
     return t(CATEGORY_I18N_KEY[cat] || cat);
@@ -173,7 +170,7 @@
     var revBadge = document.getElementById("statRevenueBadge");
     if (prevBucket && Number(prevBucket.revenueCny)) {
       var chg = (revenue - Number(prevBucket.revenueCny)) / Number(prevBucket.revenueCny) * 100;
-      revBadge.textContent = t("vsPrevPeriod", { pct: (chg >= 0 ? "+" : "") + chg.toFixed(1) + "%" });
+      revBadge.textContent = t("vsPrevPeriod", { pct: (chg >= 0 ? "+" : "") + chg.toFixed(2) + "%" });
       revBadge.className = "ins-badge " + (chg >= 0 ? "success" : "danger");
     } else {
       revBadge.textContent = t("noData");
@@ -182,7 +179,7 @@
 
     var opBadge = document.getElementById("statOperatingMarginBadge");
     var opMarginPct = revenue ? (operatingProfit / revenue * 100) : null;
-    opBadge.textContent = t("colOperatingMarginPct") + " " + fmtPct(opMarginPct);
+    opBadge.innerHTML = t("colOperatingMarginPct") + " " + fmtPct(opMarginPct);
     opBadge.className = "ins-badge " + (opMarginPct !== null && opMarginPct >= 0 ? "success" : "danger");
 
     // 예산이나 실적이 미입력(null)이면 집행률은 계산하지 않고 「미입력」으로 둡니다.
@@ -199,7 +196,7 @@
       execEl.textContent = t("noData");
     } else {
       execPct = actualTotal / budgetTotal * 100;
-      execEl.textContent = fmtPct(execPct);
+      execEl.innerHTML = fmtPct(execPct);
     }
     bar.style.width = (execPct === null ? 0 : Math.min(execPct, 100)) + "%";
     bar.style.background = (execPct !== null && execPct > 100) ? themeVar("--danger") : themeVar("--ok");
@@ -239,7 +236,7 @@
         { type: "bar", stack: "wf", itemStyle: { color: "transparent" }, silent: true, data: base },
         {
           type: "bar", stack: "wf", barWidth: "55%",
-          label: { show: true, position: "top", color: c.text, formatter: function (p) { return fmt(value[p.dataIndex]); } },
+          label: { show: true, position: "top", color: c.text, formatter: function (p) { return fmtChart(value[p.dataIndex]); } },
           data: value.map(function (v, i) { return { value: v, itemStyle: { color: colors[i], borderRadius: 3 } }; })
         }
       ]
@@ -318,7 +315,7 @@
       } else {
         var pct = (actual - budget) / budget * 100;
         varianceCell = "<span class='ins-badge " + (pct > 0 ? "danger" : "success") + "'>" +
-          (pct > 0 ? "+" : "") + pct.toFixed(1) + "%</span>";
+          (pct > 0 ? "+" : "") + pct.toFixed(2) + "%</span>";
       }
 
       var tr = document.createElement("tr");
@@ -327,7 +324,7 @@
         "<td>" + categoryLabel(cat) + "</td>" +
         "<td>" + gaCell(budget) + "</td>" +
         "<td>" + gaCell(actual) + "</td>" +
-        "<td>" + varianceCell + "</td>";
+        "<td class='pct'>" + varianceCell + "</td>";
       body.appendChild(tr);
     });
 
@@ -361,7 +358,7 @@
     gaBarChart.setOption({
       tooltip: {
         trigger: "axis", axisPointer: { type: "shadow" },
-        valueFormatter: function (v) { return (v === null || v === undefined) ? t("notEntered") : fmt(v); }
+        valueFormatter: function (v) { return (v === null || v === undefined) ? t("notEntered") : fmtChart(v); }
       },
       legend: { data: [t("colBudget"), t("colActual")], top: 0, textStyle: { color: c.axis, fontSize: 11 } },
       grid: { left: 90, right: 20, top: 34, bottom: 20 },
@@ -436,7 +433,7 @@
     var currentData = rows.map(function (r) { return r.currentRatioPct === null || r.currentRatioPct === undefined ? null : Number(r.currentRatioPct); });
 
     stabilityChart.setOption({
-      tooltip: { trigger: "axis", valueFormatter: function (v) { return v === null ? t("noData") : Number(v).toFixed(1) + "%"; } },
+      tooltip: { trigger: "axis", valueFormatter: function (v) { return v === null ? t("noData") : Number(v).toFixed(2) + "%"; } },
       legend: { data: [t("colDebtRatio"), t("colCurrentRatio")], top: 0, textStyle: { color: c.axis, fontSize: 11 } },
       grid: { left: 56, right: 24, top: 34, bottom: 24 },
       xAxis: { type: "category", data: labels, axisLine: { lineStyle: { color: c.border } }, axisLabel: { color: c.axis, fontSize: 10 }, axisTick: { show: false } },

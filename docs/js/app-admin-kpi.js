@@ -13,13 +13,8 @@
     el.classList.add("show");
     setTimeout(function () { el.classList.remove("show"); }, 3000);
   }
-  function fmt(n) {
-    if (n === null || n === undefined) return t("noData");
-    return Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
-  }
-  function fmtPct(n) {
-    return (n === null || n === undefined) ? t("noData") : Number(n).toFixed(1) + "%";
-  }
+  function fmt(n) { return window.fmtMoney(n); }
+  function fmtPct(n) { return window.fmtPercent(n); }
 
   function getKey() { return document.getElementById("adminKey").value; }
   function getYm() { return document.getElementById("adminYm").value; }
@@ -75,17 +70,18 @@
       var tr = document.createElement("tr");
       tr.innerHTML =
         "<td>" + (i + 1) + "</td>" +
-        "<td>" + window.corpLabel(row.corp) + "</td>" +
+        // 법인명은 숫자가 아니라 왼쪽 맞춤(.txt). 나머지 숫자 열은 num-table 기본값(오른쪽).
+        "<td class='txt'>" + window.corpLabel(row.corp) + "</td>" +
         "<td>" + fmt(row.revenueCny) + "</td>" +
-        "<td>" + fmtPct(row.operatingMarginPct) + "</td>" +
-        "<td>" + fmtPct(row.netMarginPct) + "</td>" +
-        "<td>" + fmtPct(row.debtRatioPct) + "</td>" +
-        "<td>" + fmtPct(row.currentRatioPct) + "</td>" +
-        "<td>" + fmtPct(row.roePct) + "</td>" +
-        "<td>" + fmtPct(row.roiPct) + "</td>" +
-        "<td>" + fmtPct(row.equityRatioPct) + "</td>" +
-        "<td>" + fmtPct(row.achievementPct) + "</td>" +
-        "<td>" + fmtPct(row.cashChangePct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.operatingMarginPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.netMarginPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.debtRatioPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.currentRatioPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.roePct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.roiPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.equityRatioPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.achievementPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(row.cashChangePct) + "</td>" +
         "<td>" + fmt(row.loanBalanceCny) + "</td>";
       body.appendChild(tr);
     });
@@ -115,7 +111,17 @@
       aoa.push([i + 1, window.corpLabel(row.corp), row.revenueCny, row.operatingMarginPct, row.netMarginPct,
         row.debtRatioPct, row.currentRatioPct, row.roePct, row.roiPct, row.equityRatioPct, row.achievementPct, row.cashChangePct, row.loanBalanceCny]);
     });
+    // 셀 값은 숫자 그대로 두고 표시 서식만 지정합니다(받는 쪽에서 합계·수식을 쓸 수 있게).
+    // 금액은 #,##0_);[빨강](#,##0), 비율은 소수점 2자리.
     var ws = XLSX.utils.aoa_to_sheet(aoa);
+    var MONEY_COLS = [2, 12], PCT_COLS = [3, 4, 5, 6, 7, 8, 9, 10, 11];
+    for (var r = 1; r < aoa.length; r++) {
+      MONEY_COLS.concat(PCT_COLS).forEach(function (c) {
+        var cell = ws[XLSX.utils.encode_cell({ c: c, r: r })];
+        if (!cell || cell.t !== "n") return;
+        cell.z = MONEY_COLS.indexOf(c) !== -1 ? '#,##0_);[Red](#,##0)' : '0.00"%"';
+      });
+    }
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, getYm());
     window.downloadWorkbook(wb, t("fileNamePrefix") + "_경영지표_" + getYm() + ".xlsx");
@@ -149,8 +155,8 @@
         "<td>" + fmt(row.revenueCny) + "</td>" +
         "<td>" + fmt(row.operatingProfitCny) + "</td>" +
         "<td>" + fmt(row.netProfitCny) + "</td>" +
-        "<td>" + fmtPct(opPct) + "</td>" +
-        "<td>" + fmtPct(netPct) + "</td>";
+        "<td class='pct'>" + fmtPct(opPct) + "</td>" +
+        "<td class='pct'>" + fmtPct(netPct) + "</td>";
       body.appendChild(tr);
     });
     var ctx2d = document.getElementById("dProfitChart").getContext("2d");
@@ -169,9 +175,9 @@
     });
     var last = dRawProfitSeries.length ? dRawProfitSeries[dRawProfitSeries.length - 1] : null;
     if (last && last.revenueCny) {
-      document.getElementById("dSalesMarginPct").textContent = fmtPct(last.salesProfitCny / last.revenueCny * 100);
-      document.getElementById("dOperatingMarginPct").textContent = fmtPct(last.operatingProfitCny / last.revenueCny * 100);
-      document.getElementById("dNetMarginPct").textContent = fmtPct(last.netProfitCny / last.revenueCny * 100);
+      document.getElementById("dSalesMarginPct").innerHTML = fmtPct(last.salesProfitCny / last.revenueCny * 100);
+      document.getElementById("dOperatingMarginPct").innerHTML = fmtPct(last.operatingProfitCny / last.revenueCny * 100);
+      document.getElementById("dNetMarginPct").innerHTML = fmtPct(last.netProfitCny / last.revenueCny * 100);
     } else {
       document.getElementById("dSalesMarginPct").textContent = t("noData");
       document.getElementById("dOperatingMarginPct").textContent = t("noData");
@@ -184,27 +190,27 @@
     body.innerHTML = "";
     rows.forEach(function (row) {
       var tr = document.createElement("tr");
-      tr.innerHTML = "<td>" + row.yearmonth + "</td><td>" + fmtPct(row.debtRatioPct) + "</td><td>" + fmtPct(row.currentRatioPct) + "</td>";
+      tr.innerHTML = "<td>" + row.yearmonth + "</td><td class='pct'>" + fmtPct(row.debtRatioPct) + "</td><td class='pct'>" + fmtPct(row.currentRatioPct) + "</td>";
       body.appendChild(tr);
     });
   }
   function renderDRatios(r) {
-    document.getElementById("dRoe").textContent = fmtPct(r.roePct);
-    document.getElementById("dRoi").textContent = fmtPct(r.roiPct);
-    document.getElementById("dDebtRatio").textContent = fmtPct(r.debtRatioPct);
-    document.getElementById("dEquityRatio").textContent = fmtPct(r.equityRatioPct);
+    document.getElementById("dRoe").innerHTML = fmtPct(r.roePct);
+    document.getElementById("dRoi").innerHTML = fmtPct(r.roiPct);
+    document.getElementById("dDebtRatio").innerHTML = fmtPct(r.debtRatioPct);
+    document.getElementById("dEquityRatio").innerHTML = fmtPct(r.equityRatioPct);
   }
   function renderDBudget(s) {
-    document.getElementById("dTargetProfitCny").textContent = fmt(s.targetProfitCny);
-    document.getElementById("dActualProfitCny").textContent = fmt(s.actualProfitCny);
-    document.getElementById("dProfitAchievementPct").textContent = fmtPct(s.profitAchievementPct);
+    document.getElementById("dTargetProfitCny").innerHTML = fmt(s.targetProfitCny);
+    document.getElementById("dActualProfitCny").innerHTML = fmt(s.actualProfitCny);
+    document.getElementById("dProfitAchievementPct").innerHTML = fmtPct(s.profitAchievementPct);
   }
   function renderDFund(s) {
-    document.getElementById("dFundEndingCny").textContent = fmt(s.endingCny);
-    document.getElementById("dFundPrevEndingCny").textContent = fmt(s.prevEndingCny);
-    document.getElementById("dFundChangePct").textContent = fmtPct(s.cashChangePct);
-    document.getElementById("dFundLoanBalance").textContent = fmt(s.totalLoanBalanceCny);
-    document.getElementById("dFundDividend").textContent = fmt(s.dividendAvailableCny);
+    document.getElementById("dFundEndingCny").innerHTML = fmt(s.endingCny);
+    document.getElementById("dFundPrevEndingCny").innerHTML = fmt(s.prevEndingCny);
+    document.getElementById("dFundChangePct").innerHTML = fmtPct(s.cashChangePct);
+    document.getElementById("dFundLoanBalance").innerHTML = fmt(s.totalLoanBalanceCny);
+    document.getElementById("dFundDividend").innerHTML = fmt(s.dividendAvailableCny);
   }
 
   function fetchDrilldown() {
@@ -299,7 +305,7 @@
     var html =
       "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>" +
       "<head><meta charset='UTF-8'><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->" +
-      "<style>body{font-family:'Malgun Gothic',sans-serif;} table{border-collapse:collapse;width:100%;}</style></head>" +
+      "<style>body{font-family:'Malgun Gothic',sans-serif;} table{border-collapse:collapse;width:100%;} .neg{color:#FF0000;}</style></head>" +
       "<body><h2>" + t("wordReportTitle") + "</h2>" +
       "<p>" + window.corpLabel(d.corp) + " · " + (d.office ? window.officeLabel(d.office) : t("officeAllOption")) + " · " + d.ym + "</p>" +
       "<table>" + bodyRows + "</table></body></html>";
