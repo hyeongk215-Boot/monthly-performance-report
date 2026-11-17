@@ -218,10 +218,11 @@ end;
 $$;
 
 
-grant execute on function perf_yjc_offices() to anon, authenticated;
-grant execute on function perf_target_bucket_offices(text, text[], text, text) to anon, authenticated;
-grant execute on function perf_target_bucket(text, text, text, text) to anon, authenticated;
-grant execute on function get_target_performance_group(text, text, text, text, text) to anon, authenticated;
+REVOKE EXECUTE ON FUNCTION perf_yjc_offices() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION perf_target_bucket_offices(text, text[], text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION perf_target_bucket(text, text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION get_target_performance_group(text, text, text, text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_target_performance_group(text, text, text, text, text) TO anon;
 
 -- 배포 확인용 (모두 true여야 합니다)
 select
