@@ -619,18 +619,26 @@ begin
 end;
 $$;
 
-grant execute on function perf_all_corps() to anon, authenticated;
-grant execute on function perf_yjc_offices() to anon, authenticated;
-grant execute on function perf_target_bucket_offices(text, text[], text, text) to anon, authenticated;
-grant execute on function perf_target_bucket(text, text, text, text) to anon, authenticated;
-grant execute on function get_profitability_series(text, text, text, integer, text) to anon, authenticated;
-grant execute on function get_stability_series(text, text, text, integer, text) to anon, authenticated;
-grant execute on function get_budget_variance_summary(text, text, text, text) to anon, authenticated;
-grant execute on function get_fund_risk_summary(text, text, text) to anon, authenticated;
-grant execute on function get_financial_ratios(text, text, text) to anon, authenticated;
-grant execute on function get_target_performance_series(text, text, text, text, text, text) to anon, authenticated;
-grant execute on function get_target_performance_group(text, text, text, text, text) to anon, authenticated;
-grant execute on function get_performance_aggregate(text, text) to anon, authenticated;
+REVOKE EXECUTE ON FUNCTION perf_all_corps() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION perf_yjc_offices() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION perf_target_bucket_offices(text, text[], text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION perf_target_bucket(text, text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION get_profitability_series(text, text, text, integer, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_profitability_series(text, text, text, integer, text) TO anon;
+REVOKE EXECUTE ON FUNCTION get_stability_series(text, text, text, integer, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_stability_series(text, text, text, integer, text) TO anon;
+REVOKE EXECUTE ON FUNCTION get_budget_variance_summary(text, text, text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_budget_variance_summary(text, text, text, text) TO anon;
+REVOKE EXECUTE ON FUNCTION get_fund_risk_summary(text, text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_fund_risk_summary(text, text, text) TO anon;
+REVOKE EXECUTE ON FUNCTION get_financial_ratios(text, text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_financial_ratios(text, text, text) TO anon;
+REVOKE EXECUTE ON FUNCTION get_target_performance_series(text, text, text, text, text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_target_performance_series(text, text, text, text, text, text) TO anon;
+REVOKE EXECUTE ON FUNCTION get_target_performance_group(text, text, text, text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_target_performance_group(text, text, text, text, text) TO anon;
+REVOKE EXECUTE ON FUNCTION get_performance_aggregate(text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_performance_aggregate(text, text) TO anon;
 
 -- ⚠ 추가분(재무지표 분석 insights.html 전용, 기존 함수는 변경하지 않음): 예산관리의
 -- bgt_ga_lines(일반관리비 11개 카테고리 예산/실적)를 기간 합산해서 카테고리별로 반환합니다.
@@ -689,4 +697,5 @@ begin
 end;
 $$;
 
-grant execute on function get_ga_breakdown(text, text, text, text, text) to anon, authenticated;
+REVOKE EXECUTE ON FUNCTION get_ga_breakdown(text, text, text, text, text) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION get_ga_breakdown(text, text, text, text, text) TO anon;
